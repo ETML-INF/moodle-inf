@@ -1,0 +1,27 @@
+[submodule "mod/hvp"]
+	path = mod/hvp
+	url = https://github.com/h5p/moodle-mod_hvp
+[submodule "blocks/completion_progress"]
+	path = blocks/completion_progress
+	url = https://github.com/deraadt/moodle-block_completion_progress.git
+[submodule "lib/editor/atto/plugins/hvp"]
+	path = lib/editor/atto/plugins/hvp
+	url = https://github.com/nadavkav/moodle-atto_hvp.git
+[submodule "mod/vpl"]
+	path = mod/vpl
+	url = https://github.com/jcrodriguez-dis/moodle-mod_vpl.git
+[submodule "report/editdates"]
+	path = report/editdates
+	url = https://github.com/moodleou/moodle-report_editdates.git
+[submodule "mod/game"]
+	path = mod/game
+	url = https://github.com/bdaloukas/moodle-mod_game
+[submodule "mod/quizgame"]
+	path = mod/quizgame
+	url = https://github.com/xow/moodle-mod_quizgame
+[submodule "blocks/xp"]
+	path = blocks/xp
+	url = https://github.com/FMCorz/moodle-block_xp
+[submodule "blocks/objectives"]
+	path = blocks/objectives
+	url = https://github.com/davosmith/moodle-objectives
