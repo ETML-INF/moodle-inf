@@ -50,7 +50,7 @@ if [ $LAST -eq 0 ] | [ "$1" = "--force" ]; then
             LAST=$?
             if [ $LAST -eq 0 ] ; then
               echo "Pull and restart updated script $0"
-              git pull && bash "$0" && exit 0
+              git pull && bash "$0" --force && exit 0
             else
               echo -e "Backup DB\n" && mysqldump --add-drop-table -h "$DB_PROD_HOST" -u "$DB_PROD_USER" --password="$DB_PROD_PASSWORD" "$DB_PROD_NAME" | gzip -v > ${DB_BACKUP_DIRECTORY}/moodle-pre-deploy-$(date +%d.%m.%Y-%Hh%Mm%Ss).sql.gz && \
               echo -e "Git PULL\n" &&  git pull && \
