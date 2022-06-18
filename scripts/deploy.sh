@@ -30,7 +30,7 @@ fi
 #pre-flight check
 git fetch --dry-run 2>&1 | grep main
 LAST=$?
-if [ $LAST -eq 0 ] | [ "$1" = "--force" ]; then
+if [ $LAST -eq 0 ] || [ "$1" = "--force" ]; then
   read -r -p "Do you really want to deploy ? [y/N] " response
   case "$response" in
       [yY][eE][sS]|[yY])
