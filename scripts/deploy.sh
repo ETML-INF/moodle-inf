@@ -58,7 +58,7 @@ else
                 echo -e "Moodle OFFLINE\n" &&  php admin/cli/maintenance.php --enable
                 LAST=$?
                 if [ $LAST -eq 0 ] ; then
-                  echo "Pull and restart updated script $0"
+                  echo "/!\DEPLOY SCRIPT UPDATE DETECTED/!\ : Pull and restart updated script $0"
                   git pull && bash "$0" --force && exit 0
                 else
                   echo "Cannot go offline, stopping deploy"
