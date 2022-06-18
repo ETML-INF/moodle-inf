@@ -19,12 +19,14 @@ MOODLE_UPGRADE_LOG="moodle-upgrade-$(date +%d.%m.%Y-%Hh%Mm%Ss).log"
 if [ ! -d $DB_BACKUP_DIRECTORY ]; then
   mkdir ${DB_BACKUP_DIRECTORY}
 fi
+
+BRANCH="main"
 ################ END CONFIG ##########
 
 #Only MODIFY THIS function to avoid script issues
 function deploy()
 {
-  SHORT_STAT=$(git diff --shortstat)
+  SHORT_STAT=$(git diff origin/$BRANCH --shortstat)
   #DELAY to let a last possibility to stop
   for ((i=5;i>=1;i--));
   do
@@ -46,7 +48,7 @@ function confirmDeploy()
   echo "#####################################"
   echo "# READY TO DEPLOY following CHANGES #"
   echo "#####################################"
-  git diff --compact-summary
+  git diff origin/$BRANCH --compact-summary
   echo ""
 
   read -r -p "Do you really want to DEPLOY this ? [y/N] " response
@@ -62,7 +64,7 @@ function confirmDeploy()
 }
 
 #Check if script has been modified (reload if needed)
-git fetch && git diff --stat | grep "$0"
+git fetch && git diff origin/$BRANCH --stat | grep "$0"
 LAST=$?
 if [ $LAST -eq 0 ] ; then
   echo "/!\DEPLOY SCRIPT UPDATE DETECTED - UPDATING/!\ "
