@@ -28,7 +28,7 @@ function deploy()
   #DELAY to let a last possibility to stop
   for ((i=5;i>=1;i--));
   do
-     echo "Starting deploy [$(SHORT_STAT)] in $i secs (press CTRL-C to exit)"
+     echo "Starting deploy [${SHORT_STAT}] in $i secs (press CTRL-C to exit)"
      sleep 1
   done
 
