@@ -13,6 +13,8 @@ DB_BACKUP_DIRECTORY="pre-deploy-backups"
 
 REPO="https://github.com/ETML-INF/moodle-inf.git"
 
+MOODLE_UPGRADE_LOG="moodle-upgrade-$(date +%d.%m.%Y-%Hh%Mm%Ss).log"
+
 # Init repo if needed (FIRST TIME ONLY)
 # this may need be done manually...
 if [ ! -d .git ]; then
@@ -55,7 +57,7 @@ if [ $LAST -eq 0 ] || [ "$1" = "--force" ]; then
               echo -e "Backup DB\n" && mysqldump --add-drop-table -h "$DB_PROD_HOST" -u "$DB_PROD_USER" --password="$DB_PROD_PASSWORD" "$DB_PROD_NAME" | gzip -v > ${DB_BACKUP_DIRECTORY}/moodle-pre-deploy-$(date +%d.%m.%Y-%Hh%Mm%Ss).sql.gz && \
               echo -e "Git PULL\n" &&  git pull && \
               echo -e "Git Submodule update\n" &&  bash ./scripts/git-sub-update-init.sh && \
-              echo -e "Moodle upgrade\n" &&  php admin/cli/upgrade.php --non-interactive --verbose-settings > moodle-upgrade-$(date +%d.%m.%Y-%Hh%Mm%Ss).log 2>&1 && \
+              echo -e "Moodle upgrade\n" &&  php admin/cli/upgrade.php --non-interactive --verbose-settings > "$MOODLE_UPGRADE_LOG"  2>&1 && cat "$MOODLE_UPGRADE_LOG" && \
               echo -e "Moodle ONLINE\n" &&  php admin/cli/maintenance.php --disable
             fi
           else
