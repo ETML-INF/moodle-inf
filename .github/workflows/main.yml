@@ -1,0 +1,29 @@
+name: staging
+
+# Controls when the workflow will run
+on:
+  # Triggers the workflow on push or pull request events but only for the "main" branch
+  push:
+    branches: [ "main" ]
+    tags: [ "v*" ]
+  pull_request:
+    branches: [ "main" ]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  call-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      #Courtesy of https://www.maxivanov.io/github-actions-deploy-to-multiple-environments-from-single-workflow/
+      - name: Set env vars (staging)
+        if: github.ref_type == 'branch'
+        run: echo "DEPLOY_DIR=${{secrets.HOME_DIRECTORY_STAGING}}" >> $GITHUB_ENV
+      - name: Set env vars (prod)
+        if: github.ref_type == 'tag'
+        run: echo "DEPLOY_DIR=${{secrets.HOME_DIRECTORY_PRODUCTION}}" >> $GITHUB_ENV
+      - uses: ./.github/workflows/deploy.yml
+        with:
+          deploy_home_dir: $DEPLOY_DIR

@@ -1,4 +1,5 @@
 #!/bin/bash
+# HELP: deploy.sh <SHA> [--no-interaction]
 ############# START CONFIG ############
 CONFIG="config.php"
 if [ ! -f $CONFIG ]; then
@@ -20,13 +21,14 @@ if [ ! -d $DB_BACKUP_DIRECTORY ]; then
   mkdir ${DB_BACKUP_DIRECTORY}
 fi
 
-BRANCH="main"
+SHA=$1
+#BRANCH="main"
 ################ END CONFIG ##########
 
 #Only MODIFY THIS function to avoid script issues
 function deploy()
 {
-  SHORT_STAT=$(git diff origin/$BRANCH --shortstat)
+  SHORT_STAT=$(git diff "$SHA" --shortstat)
   #DELAY to let a last possibility to stop
   for ((i=5;i>=1;i--));
   do
@@ -37,7 +39,7 @@ function deploy()
   echo -e "Moodle OFFLINE\n" &&  php admin/cli/maintenance.php --enable && \
   echo -e "Backup DB\n" && mysqldump --add-drop-table -h "$DB_PROD_HOST" -u "$DB_PROD_USER" --password="$DB_PROD_PASSWORD" "$DB_PROD_NAME" | \
     gzip -v > ${DB_BACKUP_DIRECTORY}/moodle-pre-deploy-$(date +%d.%m.%Y-%Hh%Mm%Ss).sql.gz && \
-  echo -e "Git PULL\n" &&  git pull && \
+  echo -e "Git PULL\n" &&  git pull origin "$SHA" && \
   echo -e "Git Submodule update\n" &&  bash ./scripts/git-sub-update-init.sh && \
   echo -e "Moodle upgrade\n" &&  php admin/cli/upgrade.php --non-interactive --verbose-settings > "$MOODLE_UPGRADE_LOG"  2>&1 && cat "$MOODLE_UPGRADE_LOG" && \
   echo -e "Moodle ONLINE\n" &&  php admin/cli/maintenance.php --disable && echo -e "\n\nYuhuu ;-)"
@@ -48,7 +50,7 @@ function confirmDeploy()
   echo "#####################################"
   echo "# READY TO DEPLOY following CHANGES #"
   echo "#####################################"
-  git diff origin/$BRANCH --compact-summary
+  git diff "$SHA" --compact-summary
   echo ""
 
   read -r -p "Do you really want to DEPLOY this ? [y/N] " response
@@ -64,16 +66,16 @@ function confirmDeploy()
 }
 
 #Check if script has been modified (reload if needed)
-git fetch && git diff origin/$BRANCH --stat | grep "$0"
+git fetch && git diff "$SHA" --stat | grep "$0"
 LAST=$?
 if [ $LAST -eq 0 ] ; then
   echo "/!\DEPLOY SCRIPT UPDATE DETECTED - UPDATING/!\ "
   #GO OFFLINE because we will do a pull which may contain something else than only deploy script update !!!
   echo -e "Moodle OFFLINE\n" &&  php admin/cli/maintenance.php --enable && \
-    git pull && bash "$0" "$1" && exit 0
+    git pull origin "$SHA" && bash "$0" "$1" && exit 0
 else
   #No changes in deploy script, we can continue with that script
-  if [ "$1" = "--no-interaction" ] ; then
+  if [ "$2" = "--no-interaction" ] ; then
     deploy
   else
     confirmDeploy
