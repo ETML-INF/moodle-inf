@@ -53,7 +53,7 @@ function deploy()
   echo -e "Moodle OFFLINE\n" &&  php admin/cli/maintenance.php --enable && \
   echo -e "Backup DB\n" && mysqldump --add-drop-table -h "$DB_PROD_HOST" -u "$DB_PROD_USER" --password="$DB_PROD_PASSWORD" "$DB_PROD_NAME" | \
     gzip -v > ${DB_BACKUP_DIRECTORY}/moodle-pre-deploy-$(date +%d.%m.%Y-%Hh%Mm%Ss).sql.gz && \
-  echo -e "Git PULL\n" &&  git pull origin "$SHA" && \
+  echo -e "Git merge\n" && git merge --ff-only "$SHA" && \
   echo -e "Git Submodule update\n" &&  bash ./scripts/git-sub-update-init.sh && \
   echo -e "Moodle upgrade\n" &&  php admin/cli/upgrade.php --non-interactive --verbose-settings > "$MOODLE_UPGRADE_LOG"  2>&1 && cat "$MOODLE_UPGRADE_LOG" && \
   echo -e "Moodle ONLINE\n" &&  php admin/cli/maintenance.php --disable && echo -e "\n\nYuhuu ;-)"
@@ -85,14 +85,17 @@ function confirmDeploy()
 #Remove ./ if present to match git diff and detect if script has been modified
 DEPLOY_SCRIPT_CLEAN=$(echo "$0"| sed -e s~^\./~~)
 UPDATED_REPO=".repo-$SHA"
-UPDATED_SCRIPT="$0-$SHA.sh"
-git fetch && git diff --stat "$SHA" | grep "$DEPLOY_SCRIPT_CLEAN"
+echo "Fetching origin" && git fetch && git diff --stat "$SHA" | grep "$DEPLOY_SCRIPT_CLEAN"
 LAST=$?
 if [ $LAST -eq 0 ]; then
   echo "/!\DEPLOY SCRIPT UPDATE DETECTED - UPDATING/!\ "
   git worktree add "$UPDATED_REPO" "$SHA" && \
-    cp "$UPDATED_REPO/$0" "$UPDATED_SCRIPT" && bash "$UPDATED_SCRIPT" "$@" && git worktree remove "$UPDATED_REPO" && rm "$UPDATED_SCRIPT"
+    cp "$UPDATED_REPO/$0" "$0" && bash "$0" "$@" && \
+      git worktree remove "$UPDATED_REPO"
 else
+  #if script has been modified delete to allow ff merge without conflict
+  git status | grep "$DEPLOY_SCRIPT_CLEAN" && rm "$0"
+
   #No changes in deploy script, we can continue with that script
   if [ "$NO_INTERACTION" = "--no-interaction" ] ; then
     deploy
