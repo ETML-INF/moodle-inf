@@ -42,7 +42,7 @@ function reviewAndDelay()
        echo -n "$i "
        sleep 1
     done
-    echo "GO GO GO"
+    echo -e "\nGO GO GO"
 }
 
 #MAIN BUSINESS
@@ -89,14 +89,10 @@ UPDATED_REPO=".repo-$SHA"
 echo "Fetching origin" && git fetch && git diff --stat "$SHA" | grep "$DEPLOY_SCRIPT_CLEAN"
 LAST=$?
 if [ $LAST -eq 0 ]; then
-  echo "/!\DEPLOY SCRIPT UPDATE DETECTED - UPDATING/!\ "
-  git worktree add "$UPDATED_REPO" "$SHA" && \
-    cp "$UPDATED_REPO/$0" "$0" && bash "$0" "$@" && \
-      git worktree remove "$UPDATED_REPO"
+  echo "/!\DEPLOY SCRIPT UPDATE DETECTED - RUNNING UPDATED VERSION/!\ "
+  git worktree add -q "$UPDATED_REPO" "$SHA" && \
+    bash "$UPDATED_REPO/$0" "$@" && git worktree remove "$UPDATED_REPO"
 else
-  #if script has been modified delete to allow ff merge without conflict
-  git status | grep "$DEPLOY_SCRIPT_CLEAN" && rm "$0"
-
   #No changes in deploy script, we can continue with that script
   if [ "$NO_INTERACTION" = "--no-interaction" ] ; then
     deploy
