@@ -14,7 +14,7 @@ on:
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  call-deploy:
+  deploy:
     runs-on: ubuntu-latest
     steps:
       #Courtesy of https://www.maxivanov.io/github-actions-deploy-to-multiple-environments-from-single-workflow/
@@ -25,10 +25,26 @@ jobs:
       - name: Set env vars (prod)
         if: github.ref_type == 'tag'
         run: echo "DEPLOY_DIR=${{secrets.HOME_DIRECTORY_PRODUCTION}}" >> $GITHUB_ENV
+      # Courtesy of https://blog.benoitblanchon.fr/github-action-run-ssh-commands/
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh/
+          echo "$SSH_KEY" > ~/.ssh/deploy.key
+          chmod 600 ~/.ssh/deploy.key
+          cat >>~/.ssh/config <<END
+          Host deploy
+            HostName $SSH_HOST
+            Port $SSH_PORT
+            User $SSH_USER
+            IdentityFile ~/.ssh/deploy.key
+            StrictHostKeyChecking no
+          END
+        env:
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
 
-      - uses: D3rHase/ssh-command-action@v0.2.1
-        with:
-          HOST: ${{ secrets.SSH_HOST }}
-          USER: ${{ secrets.SSH_USER }}
-          PRIVATE_SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-          COMMAND: cd $DEPLOY_DIR && scripts/deploy.sh ${{github.sha}} --no-interaction
+      - name: Run deploy script by ssh
+        run: ssh deploy 'cd $DEPLOY_DIR && scripts/deploy.sh ${{github.sha}} --no-interaction'
+
