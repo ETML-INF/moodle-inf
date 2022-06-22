@@ -57,7 +57,7 @@ function deploy()
   echo -e "Git merge\n" && git merge --ff-only "$SHA" && \
   echo -e "Git Submodule update\n" &&  bash ./scripts/git-sub-update-init.sh && \
   echo -e "Moodle upgrade\n" &&  php admin/cli/upgrade.php --non-interactive --verbose-settings > "$MOODLE_UPGRADE_LOG"  2>&1 && cat "$MOODLE_UPGRADE_LOG" && \
-  echo -e "Moodle ONLINE\n" &&  php admin/cli/maintenance.php --disable && echo -e "\n\nYuhuu ;-)"
+  echo -e "Moodle ONLINE\n" &&  php admin/cli/maintenance.php --disable && echo -e "\n\nYuhuuu ;-)"
 }
 ##END MAIN BUSINESS
 
@@ -82,7 +82,7 @@ function confirmDeploy()
 
 }
 
-#Check if script has been modified (reload if needed)
+#Check if script has been modified (checkout and start other version... which has another path so $0 won’t match a second time)
 #Remove ./ if present to match git diff and detect if script has been modified
 DEPLOY_SCRIPT_CLEAN=$(echo "$0"| sed -e s~^\./~~)
 UPDATED_REPO=".repo-$SHA"
