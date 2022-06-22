@@ -42,6 +42,7 @@ function reviewAndDelay()
        echo -n "$i "
        sleep 1
     done
+    echo "GO GO GO"
 }
 
 #MAIN BUSINESS
