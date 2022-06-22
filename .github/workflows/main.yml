@@ -24,6 +24,6 @@ jobs:
       - name: Set env vars (prod)
         if: github.ref_type == 'tag'
         run: echo "DEPLOY_DIR=${{secrets.HOME_DIRECTORY_PRODUCTION}}" >> $GITHUB_ENV
-      - uses: ./.github/workflows/deploy.yml
+      - uses: ETML-INF/moodle-inf/.github/workflows/deploy.yml@${{github.sha}}
         with:
           deploy_home_dir: $DEPLOY_DIR
