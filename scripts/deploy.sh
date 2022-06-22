@@ -1,5 +1,4 @@
 #!/bin/bash
-# HELP: deploy.sh <SHA> [--no-interaction]
 ############# START CONFIG ############
 CONFIG="config.php"
 if [ ! -f $CONFIG ]; then
@@ -22,6 +21,10 @@ if [ ! -d $DB_BACKUP_DIRECTORY ]; then
 fi
 
 SHA=$1
+if [ -z "$SHA" ] || [ "$SHA" = "--help" ] ; then
+  echo "Usage: deploy.sh <SHA> [--no-interaction]"
+  exit 1
+fi
 NO_INTERACTION=$2
 #BRANCH="main"
 ################ END CONFIG ##########
@@ -48,9 +51,9 @@ function deploy()
 
 function confirmDeploy()
 {
-  echo "#####################################################################################"
+  echo "######################################################################################"
   echo "# READY TO DEPLOY following CHANGES for rev ${SHA} #"
-  echo "#####################################################################################"
+  echo "######################################################################################"
   git diff "$SHA" --compact-summary
   echo ""
 
