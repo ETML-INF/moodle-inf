@@ -27,8 +27,8 @@ jobs:
         run: echo "DEPLOY_DIR=${{secrets.HOME_DIRECTORY_PRODUCTION}}" >> $GITHUB_ENV
 
       - uses: D3rHase/ssh-command-action@v0.2.1
-          with:
-            HOST: ${{ secrets.SSH_HOST }}
-            USER: ${{ secrets.SSH_USER }}
-            PRIVATE_SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-            COMMAND: cd $DEPLOY_DIR && scripts/deploy.sh ${{github.sha}} --no-interaction
+        with:
+          HOST: ${{ secrets.SSH_HOST }}
+          USER: ${{ secrets.SSH_USER }}
+          PRIVATE_SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          COMMAND: cd $DEPLOY_DIR && scripts/deploy.sh ${{github.sha}} --no-interaction
