@@ -27,26 +27,28 @@ if [ -z "$SHA" ] || [ "$SHA" = "--help" ] ; then
 fi
 NO_INTERACTION=$2
 
-TMP_DIFF=".tmpdiff"
 #BRANCH="main"
 ################ END CONFIG ##########
 
+function reviewAndDelay()
+{
+    SHORT_STAT=$(git diff --shortstat "$SHA")
+
+    echo -n "Starting deploy [${SHORT_STAT} @ ${SHA}] in (press CTRL-C to cancel) : "
+
+    #DELAY to let a last possibility to stop
+    for ((i=5;i>=1;i--));
+    do
+       echo -n "$i "
+       sleep 1
+    done
+}
+
+#MAIN BUSINESS
 #Only MODIFY THIS function to avoid script issues
 function deploy()
 {
-  #Deploy script has been updated...
-  if [ -f $TMP_DIFF ]; then
-    SHORT_STAT=$(cat $TMP_DIFF)
-    rm $TMP_DIFF
-  else
-    SHORT_STAT=$(git diff --shortstat "$SHA")
-  fi
-  #DELAY to let a last possibility to stop
-  for ((i=5;i>=1;i--));
-  do
-     echo "Starting deploy [${SHORT_STAT} @ ${SHA}] in $i secs (press CTRL-C to exit)"
-     sleep 1
-  done
+  reviewAndDelay
 
   echo -e "Moodle OFFLINE\n" &&  php admin/cli/maintenance.php --enable && \
   echo -e "Backup DB\n" && mysqldump --add-drop-table -h "$DB_PROD_HOST" -u "$DB_PROD_USER" --password="$DB_PROD_PASSWORD" "$DB_PROD_NAME" | \
@@ -56,6 +58,7 @@ function deploy()
   echo -e "Moodle upgrade\n" &&  php admin/cli/upgrade.php --non-interactive --verbose-settings > "$MOODLE_UPGRADE_LOG"  2>&1 && cat "$MOODLE_UPGRADE_LOG" && \
   echo -e "Moodle ONLINE\n" &&  php admin/cli/maintenance.php --disable && echo -e "\n\nYuhuuuu ;-)"
 }
+##END MAIN BUSINESS
 
 function confirmDeploy()
 {
@@ -63,6 +66,7 @@ function confirmDeploy()
   echo "# READY TO DEPLOY following CHANGES for rev ${SHA} #"
   echo "######################################################################################"
   git diff "$SHA" --compact-summary
+
   echo ""
 
   read -r -p "Do you really want to DEPLOY this ? [y/N] " response
@@ -78,14 +82,14 @@ function confirmDeploy()
 }
 
 #Check if script has been modified (reload if needed)
-echo "git fetch && git diff --shortstat $SHA > $TMP_DIFF && git diff --stat $SHA | grep $0"
-git fetch && git diff --shortstat "$SHA" > $TMP_DIFF && git diff --stat "$SHA" | grep "$0"
+#Remove ./ if present to match git diff and detect if script has been modified
+DEPLOY_SCRIPT_CLEAN=echo "$0"| sed -e s~^\./~~
+UPDATED_REPO=".repo-$SHA"
+git fetch && git diff --stat "$SHA" | grep "$DEPLOY_SCRIPT_CLEAN"
 LAST=$?
-if [ $LAST -eq 0 ] && [ ! -f $TMP_DIFF ] ; then
+if [ $LAST -eq 0 ]; then
   echo "/!\DEPLOY SCRIPT UPDATE DETECTED - UPDATING/!\ "
-  #GO OFFLINE because we will do a pull which may contain something else than only deploy script update !!!
-  echo -e "Moodle OFFLINE\n" &&  php admin/cli/maintenance.php --enable && \
-    git merge --ff-only "$SHA" && bash "$0" "$@" && exit 0
+  git worktree add "$UPDATED_REPO" "$SHA" && cd "$UPDATED_REPO" && bash "$0" "$@" && git worktree remove "$UPDATED_REPO"
 else
   #No changes in deploy script, we can continue with that script
   if [ "$NO_INTERACTION" = "--no-interaction" ] ; then
@@ -94,7 +98,3 @@ else
     confirmDeploy
   fi
 fi
-
-
-
-
