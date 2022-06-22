@@ -22,6 +22,7 @@ if [ ! -d $DB_BACKUP_DIRECTORY ]; then
 fi
 
 SHA=$1
+NO_INTERACTION=$2
 #BRANCH="main"
 ################ END CONFIG ##########
 
@@ -32,7 +33,7 @@ function deploy()
   #DELAY to let a last possibility to stop
   for ((i=5;i>=1;i--));
   do
-     echo "Starting deploy [${SHORT_STAT}] in $i secs (press CTRL-C to exit)"
+     echo "Starting deploy [${SHORT_STAT} @ ${SHA}] in $i secs (press CTRL-C to exit)"
      sleep 1
   done
 
@@ -47,9 +48,9 @@ function deploy()
 
 function confirmDeploy()
 {
-  echo "#####################################"
-  echo "# READY TO DEPLOY following CHANGES #"
-  echo "#####################################"
+  echo "#####################################################################################"
+  echo "# READY TO DEPLOY following CHANGES for rev ${SHA} #"
+  echo "#####################################################################################"
   git diff "$SHA" --compact-summary
   echo ""
 
@@ -72,10 +73,10 @@ if [ $LAST -eq 0 ] ; then
   echo "/!\DEPLOY SCRIPT UPDATE DETECTED - UPDATING/!\ "
   #GO OFFLINE because we will do a pull which may contain something else than only deploy script update !!!
   echo -e "Moodle OFFLINE\n" &&  php admin/cli/maintenance.php --enable && \
-    git pull origin "$SHA" && bash "$0" "$1" && exit 0
+    git pull origin "$SHA" && bash "$0" "$@" && exit 0
 else
   #No changes in deploy script, we can continue with that script
-  if [ "$2" = "--no-interaction" ] ; then
+  if [ "$NO_INTERACTION" = "--no-interaction" ] ; then
     deploy
   else
     confirmDeploy
