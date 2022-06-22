@@ -26,13 +26,21 @@ if [ -z "$SHA" ] || [ "$SHA" = "--help" ] ; then
   exit 1
 fi
 NO_INTERACTION=$2
+
+TMP_DIFF=".tmpdiff"
 #BRANCH="main"
 ################ END CONFIG ##########
 
 #Only MODIFY THIS function to avoid script issues
 function deploy()
 {
-  SHORT_STAT=$(git diff "$SHA" --shortstat)
+  #Deploy script has been updated...
+  if [ -f $TMP_DIFF ]; then
+    SHORT_STAT=$(cat $TMP_DIFF)
+    rm $TMP_DIFF
+  else
+    SHORT_STAT=$(git diff --shortstat "$SHA")
+  fi
   #DELAY to let a last possibility to stop
   for ((i=5;i>=1;i--));
   do
@@ -70,13 +78,14 @@ function confirmDeploy()
 }
 
 #Check if script has been modified (reload if needed)
-git fetch && git diff "$SHA" --stat | grep "$0"
+echo "git fetch && git diff --shortstat $SHA > $TMP_DIFF && git diff --stat $SHA | grep $0"
+git fetch && git diff --shortstat "$SHA" > $TMP_DIFF && git diff --stat "$SHA" | grep "$0"
 LAST=$?
-if [ $LAST -eq 0 ] ; then
+if [ $LAST -eq 0 ] && [ ! -f $TMP_DIFF ] ; then
   echo "/!\DEPLOY SCRIPT UPDATE DETECTED - UPDATING/!\ "
   #GO OFFLINE because we will do a pull which may contain something else than only deploy script update !!!
   echo -e "Moodle OFFLINE\n" &&  php admin/cli/maintenance.php --enable && \
-    git pull origin "$SHA" && bash "$0" "$@" && exit 0
+    git merge --ff-only "$SHA" && bash "$0" "$@" && exit 0
 else
   #No changes in deploy script, we can continue with that script
   if [ "$NO_INTERACTION" = "--no-interaction" ] ; then
