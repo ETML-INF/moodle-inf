@@ -46,5 +46,5 @@ jobs:
           SSH_PORT: ${{ secrets.SSH_PORT }}
 
       - name: Run deploy script by ssh
-        run: ssh deploy 'cd ${{ env.MY_DEPLOY_DIR }} && bash ./scripts/deploy.sh ${{github.sha}} --no-interaction'
+        run: ssh deploy 'cd ${{ env.DEPLOY_DIR }} && bash ./scripts/deploy.sh ${{github.sha}} --no-interaction'
 
