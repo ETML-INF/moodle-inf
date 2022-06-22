@@ -83,13 +83,15 @@ function confirmDeploy()
 
 #Check if script has been modified (reload if needed)
 #Remove ./ if present to match git diff and detect if script has been modified
-DEPLOY_SCRIPT_CLEAN=echo "$0"| sed -e s~^\./~~
+DEPLOY_SCRIPT_CLEAN=$(echo "$0"| sed -e s~^\./~~)
 UPDATED_REPO=".repo-$SHA"
+UPDATED_SCRIPT="$0-$SHA.sh"
 git fetch && git diff --stat "$SHA" | grep "$DEPLOY_SCRIPT_CLEAN"
 LAST=$?
 if [ $LAST -eq 0 ]; then
   echo "/!\DEPLOY SCRIPT UPDATE DETECTED - UPDATING/!\ "
-  git worktree add "$UPDATED_REPO" "$SHA" && cd "$UPDATED_REPO" && bash "$0" "$@" && git worktree remove "$UPDATED_REPO"
+  git worktree add "$UPDATED_REPO" "$SHA" && \
+    cp "$UPDATED_REPO/$0" "$UPDATED_SCRIPT" && bash "$UPDATED_SCRIPT" "$@" && git worktree remove "$UPDATED_REPO" && rm "$UPDATED_SCRIPT"
 else
   #No changes in deploy script, we can continue with that script
   if [ "$NO_INTERACTION" = "--no-interaction" ] ; then
