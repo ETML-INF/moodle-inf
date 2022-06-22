@@ -21,9 +21,14 @@ jobs:
       - name: Set env vars (staging)
         if: github.ref_type == 'branch'
         run: echo "DEPLOY_DIR=${{secrets.HOME_DIRECTORY_STAGING}}" >> $GITHUB_ENV
+
       - name: Set env vars (prod)
         if: github.ref_type == 'tag'
         run: echo "DEPLOY_DIR=${{secrets.HOME_DIRECTORY_PRODUCTION}}" >> $GITHUB_ENV
-      - uses: ETML-INF/moodle-inf/.github/workflows/deploy.yml@${{github.sha}}
-        with:
-          deploy_home_dir: $DEPLOY_DIR
+
+      - uses: D3rHase/ssh-command-action@v0.2.1
+          with:
+            HOST: ${{ secrets.SSH_HOST }}
+            USER: ${{ secrets.SSH_USER }}
+            PRIVATE_SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+            COMMAND: cd $DEPLOY_DIR && scripts/deploy.sh ${{github.sha}} --no-interaction
