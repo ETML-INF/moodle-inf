@@ -56,7 +56,7 @@ function deploy()
   echo -e "Git PULL\n" &&  git pull origin "$SHA" && \
   echo -e "Git Submodule update\n" &&  bash ./scripts/git-sub-update-init.sh && \
   echo -e "Moodle upgrade\n" &&  php admin/cli/upgrade.php --non-interactive --verbose-settings > "$MOODLE_UPGRADE_LOG"  2>&1 && cat "$MOODLE_UPGRADE_LOG" && \
-  echo -e "Moodle ONLINE\n" &&  php admin/cli/maintenance.php --disable && echo -e "\n\nYuhuuuu ;-)"
+  echo -e "Moodle ONLINE\n" &&  php admin/cli/maintenance.php --disable && echo -e "\n\nYuhuu ;-)"
 }
 ##END MAIN BUSINESS
 
