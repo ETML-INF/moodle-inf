@@ -70,3 +70,4 @@ class field_class_test extends \advanced_testcase {
         ];
     }
 }
+

@@ -48,6 +48,10 @@ class weblib_test extends advanced_testcase {
         // Unicode entities.
         $this->assertSame("&#4475;", format_string("&#4475;"));
 
+        // Nulls.
+        $this->assertSame('', format_string(null));
+        $this->assertSame('', format_string(null, true, ['escape' => false]));
+
         // < and > signs.
         $originalformatstringstriptags = $CFG->formatstringstriptags;
 
@@ -595,6 +599,20 @@ EXPECTED;
                 'result' => false
             ],
 
+            // Empty e-mail addresess are not valid.
+            [
+                'email' => '',
+                'result' => false,
+            ],
+            [
+                'email' => null,
+                'result' => false,
+            ],
+            [
+                'email' => false,
+                'result' => false,
+            ],
+
             // Extra email addresses from Wikipedia page on Email Addresses.
             // Valid.
             [
@@ -940,5 +958,31 @@ EXPECTED;
         $CFG->maxconsecutiveidentchars = 1;
 
         $this->assertNotEquals($policydisabled, print_password_policy());
+    }
+
+    /**
+     * Data provider for the testing get_html_lang_attribute_value().
+     *
+     * @return string[][]
+     */
+    public function get_html_lang_attribute_value_provider() {
+        return [
+            'Empty lang code' => ['    ', 'unknown'],
+            'English' => ['en', 'en'],
+            'English, US' => ['en_us', 'en-us'],
+        ];
+    }
+
+    /**
+     * Test for get_html_lang_attribute_value().
+     *
+     * @covers ::get_html_lang_attribute_value()
+     * @dataProvider get_html_lang_attribute_value_provider
+     * @param string $langcode The language code to convert.
+     * @param string $expected The expected converted value.
+     * @return void
+     */
+    public function test_get_html_lang_attribute_value(string $langcode, string $expected): void {
+        $this->assertEquals($expected, get_html_lang_attribute_value($langcode));
     }
 }

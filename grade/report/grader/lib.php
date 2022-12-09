@@ -257,7 +257,7 @@ class grade_report_grader extends grade_report {
                     }
 
                     if (!$gradeitem = grade_item::fetch(array('id'=>$itemid, 'courseid'=>$this->courseid))) {
-                        print_error('invalidgradeitemid');
+                        throw new \moodle_exception('invalidgradeitemid');
                     }
 
                     // Pre-process grade
@@ -1994,7 +1994,7 @@ class grade_report_grader extends grade_report {
      *
      * @return int The maximum number of students to display per page
      */
-    public function get_students_per_page() {
-        return $this->get_pref('studentsperpage');
+    public function get_students_per_page(): int {
+        return (int) $this->get_pref('studentsperpage');
     }
 }

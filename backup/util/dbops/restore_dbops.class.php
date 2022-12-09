@@ -1019,21 +1019,26 @@ abstract class restore_dbops {
                 continue;
             }
 
+            // Updated the times of the new record.
+            // The file record should reflect when the file entered the system,
+            // and when this record was created.
+            $time = time();
+
             // The file record to restore.
             $file_record = array(
-                'contextid'   => $newcontextid,
-                'component'   => $component,
-                'filearea'    => $filearea,
-                'itemid'      => $rec->newitemid,
-                'filepath'    => $file->filepath,
-                'filename'    => $file->filename,
-                'timecreated' => $file->timecreated,
-                'timemodified'=> $file->timemodified,
-                'userid'      => $mappeduserid,
-                'source'      => $file->source,
-                'author'      => $file->author,
-                'license'     => $file->license,
-                'sortorder'   => $file->sortorder
+                'contextid'    => $newcontextid,
+                'component'    => $component,
+                'filearea'     => $filearea,
+                'itemid'       => $rec->newitemid,
+                'filepath'     => $file->filepath,
+                'filename'     => $file->filename,
+                'timecreated'  => $time,
+                'timemodified' => $time,
+                'userid'       => $mappeduserid,
+                'source'       => $file->source,
+                'author'       => $file->author,
+                'license'      => $file->license,
+                'sortorder'    => $file->sortorder
             );
 
             if (empty($file->repositoryid)) {
@@ -1806,10 +1811,9 @@ abstract class restore_dbops {
     public static function calculate_course_names($courseid, $fullname, $shortname) {
         global $CFG, $DB;
 
-        $currentfullname = '';
-        $currentshortname = '';
         $counter = 0;
-        // Iteratere while the name exists
+
+        // Iterate while fullname or shortname exist.
         do {
             if ($counter) {
                 $suffixfull  = ' ' . get_string('copyasnoun') . ' ' . $counter;
@@ -1818,8 +1822,11 @@ abstract class restore_dbops {
                 $suffixfull  = '';
                 $suffixshort = '';
             }
-            $currentfullname = $fullname.$suffixfull;
-            $currentshortname = substr($shortname, 0, 100 - strlen($suffixshort)).$suffixshort; // < 100cc
+
+            // Ensure we don't overflow maximum length of name fields, in multi-byte safe manner.
+            $currentfullname = core_text::substr($fullname, 0, 254 - strlen($suffixfull)) . $suffixfull;
+            $currentshortname = core_text::substr($shortname, 0, 100 - strlen($suffixshort)) . $suffixshort;
+
             $coursefull  = $DB->get_record_select('course', 'fullname = ? AND id != ?',
                     array($currentfullname, $courseid), '*', IGNORE_MULTIPLE);
             $courseshort = $DB->get_record_select('course', 'shortname = ? AND id != ?', array($currentshortname, $courseid));
