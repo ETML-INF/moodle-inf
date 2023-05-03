@@ -1222,10 +1222,9 @@ class grade_plugin_return {
      * Add return tracking params into url
      *
      * @param moodle_url $url A URL
-     *
-     * @return string $url with return tracking params
+     * @return moodle_url with return tracking params
      */
-    public function add_url_params(moodle_url $url) {
+    public function add_url_params(moodle_url $url): moodle_url {
         if (empty($this->type)) {
             return $url;
         }
@@ -1729,8 +1728,8 @@ class grade_structure {
 
         if ($menuitems) {
             $menu = new action_menu($menuitems);
-            $icon = $OUTPUT->pix_icon('i/dropdown', get_string('actions'));
-            $extraclasses = 'btn btn-icon icon-size-2 bg-secondary d-flex align-items-center justify-content-center';
+            $icon = $OUTPUT->pix_icon('i/moremenu', get_string('actions'));
+            $extraclasses = 'btn btn-link btn-icon icon-size-3 d-flex align-items-center justify-content-center';
             $menu->set_menu_trigger($icon, $extraclasses);
             $menu->set_menu_left();
 

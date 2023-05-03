@@ -26,6 +26,7 @@
 
 namespace mod_quiz\external;
 
+use core_question\local\bank\question_version_status;
 use externallib_advanced_testcase;
 use mod_quiz_external;
 use mod_quiz_display_options;
@@ -1321,7 +1322,6 @@ class external_test extends externallib_advanced_testcase {
         // Now, get the summary.
         $result = mod_quiz_external::get_attempt_summary($attempt->id);
         $result = \external_api::clean_returnvalue(mod_quiz_external::get_attempt_summary_returns(), $result);
-        $this->assertDebuggingCalled(); // Expect $PAGE->set_url debugging.
 
         // Check it's marked as completed only the first one.
         $this->assertEquals('complete', $result['questions'][0]['state']);
@@ -1947,6 +1947,10 @@ class external_test extends externallib_advanced_testcase {
         quiz_add_quiz_question($question->id, $quiz);
 
         $question = $questiongenerator->create_question('essay', null, array('category' => $cat->id));
+        quiz_add_quiz_question($question->id, $quiz);
+
+        $question = $questiongenerator->create_question('multichoice', null,
+                ['category' => $cat->id, 'status' => question_version_status::QUESTION_STATUS_DRAFT]);
         quiz_add_quiz_question($question->id, $quiz);
 
         $this->setUser($this->student);

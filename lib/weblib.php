@@ -91,13 +91,18 @@ define('URL_MATCH_EXACT', 2);
  * @return string
  */
 function s($var) {
-
     if ($var === false) {
         return '0';
     }
 
-    return preg_replace('/&amp;#(\d+|x[0-9a-f]+);/i', '&#$1;',
-            htmlspecialchars($var, ENT_QUOTES | ENT_HTML401 | ENT_SUBSTITUTE));
+    if ($var === null || $var === '') {
+        return '';
+    }
+
+    return preg_replace(
+        '/&amp;#(\d+|x[0-9a-f]+);/i', '&#$1;',
+        htmlspecialchars($var, ENT_QUOTES | ENT_HTML401 | ENT_SUBSTITUTE)
+    );
 }
 
 /**
@@ -148,6 +153,9 @@ function addslashes_js($var) {
  * @return string The remaining URL.
  */
 function strip_querystring($url) {
+    if ($url === null || $url === '') {
+        return '';
+    }
 
     if ($commapos = strpos($url, '?')) {
         return substr($url, 0, $commapos);
@@ -336,6 +344,7 @@ class moodle_url {
             $this->anchor = $url->anchor;
 
         } else {
+            $url = $url ?? '';
             // Detect if anchor used.
             $apos = strpos($url, '#');
             if ($apos !== false) {
@@ -526,6 +535,27 @@ class moodle_url {
         } else {
             return implode('&', $arr);
         }
+    }
+
+    /**
+     * Get the url params as an array of key => value pairs.
+     *
+     * This helps in handling cases where url params contain arrays.
+     *
+     * @return array params array for templates.
+     */
+    public function export_params_for_template(): array {
+        $data = [];
+        foreach ($this->params as $key => $val) {
+            if (is_array($val)) {
+                foreach ($val as $index => $value) {
+                    $data[] = ['name' => $key.'['.$index.']', 'value' => $value];
+                }
+            } else {
+                $data[] = ['name' => $key, 'value' => $val];
+            }
+        }
+        return $data;
     }
 
     /**
@@ -1115,7 +1145,7 @@ function validate_email($address) {
 
     require_once("{$CFG->libdir}/phpmailer/moodle_phpmailer.php");
 
-    return moodle_phpmailer::validateAddress($address) && !preg_match('/[<>]/', $address);
+    return moodle_phpmailer::validateAddress($address ?? '') && !preg_match('/[<>]/', $address);
 }
 
 /**
@@ -1325,9 +1355,8 @@ function format_text($text, $format = FORMAT_MOODLE, $options = null, $courseidd
 
         case FORMAT_MARKDOWN:
             $text = markdown_to_html($text);
-            if (!$options['noclean']) {
-                $text = clean_text($text, FORMAT_HTML, $options);
-            }
+            // The markdown parser does not strip dangerous html so we need to clean it, even if noclean is set to true.
+            $text = clean_text($text, FORMAT_HTML, $options);
             $text = $filtermanager->filter_text($text, $context, $filteroptions);
             break;
 
@@ -1529,7 +1558,7 @@ function format_string($string, $striplinks = true, $options = null) {
  * @return string
  */
 function replace_ampersands_not_followed_by_entity($string) {
-    return preg_replace("/\&(?![a-zA-Z0-9#]{1,8};)/", "&amp;", $string);
+    return preg_replace("/\&(?![a-zA-Z0-9#]{1,8};)/", "&amp;", $string ?? '');
 }
 
 /**
@@ -2246,7 +2275,7 @@ function get_html_lang($dir = false) {
     global $CFG;
 
     $currentlang = current_language();
-    if ($currentlang !== $CFG->lang && !get_string_manager()->translation_exists($currentlang)) {
+    if (isset($CFG->lang) && $currentlang !== $CFG->lang && !get_string_manager()->translation_exists($currentlang)) {
         // Use the default site language when the current language is not available.
         $currentlang = $CFG->lang;
         // Fix the current language.

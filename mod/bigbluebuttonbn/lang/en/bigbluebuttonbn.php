@@ -49,6 +49,7 @@ $string['bigbluebuttondisablednotification'] = 'The BigBlueButton activity modul
 $string['cannotperformaction'] = 'Cannot perform action {$a} on this recording';
 $string['enablingbigbluebutton'] = 'Enabling BigBlueButton activity';
 $string['enablingbigbluebuttondpainfo'] = 'In order to meet your data protection obligations, prior to enabling this plugin, you may need to ensure that you have read and accepted the <a href="{$a}" target="_blank">Blindside Networks data processing agreement</a>. Please consult with your own privacy professionals for advice.';
+$string['dpainfonotsigned'] = 'Before enabling this plugin, you must confirm that you have read and accepted the <a href="{$a}">Blindside Networks data processing agreement</a>.';
 $string['indicator:cognitivedepth'] = 'BigBlueButton cognitive';
 $string['indicator:cognitivedepth_help'] = 'This indicator is based on the cognitive depth reached by the student in a BigBlueButton activity.';
 $string['indicator:socialbreadth'] = 'BigBlueButton social';
@@ -181,8 +182,8 @@ $string['config_recordings_preview_default'] = 'Preview is enabled by default';
 $string['config_recordings_preview_default_description'] = 'If enabled the table includes a preview of the presentation.';
 $string['config_recordings_preview_editable'] = 'Preview feature can be edited';
 $string['config_recordings_preview_editable_description'] = 'Preview feature can be edited when the instance is added or updated.';
-$string['config_recordings_sortorder'] = 'Order the recordings in ascending order.';
-$string['config_recordings_sortorder_description'] = 'By default recordings are displayed in descending order. When checked they will be sorted in ascending order.';
+$string['config_recordings_asc_sort'] = 'List recordings in chronological order';
+$string['config_recordings_asc_sort_description'] = 'Recordings are ordered by date, either chronological or reverse chronological order (most recent recording first).';
 
 $string['config_importrecordings'] = 'Import recordings';
 $string['config_importrecordings_description'] = 'These settings are feature specific.';
@@ -325,14 +326,14 @@ $string['guestaccess_join_meeting'] = 'Join meeting';
 $string['guest_invitation_subject'] = 'Invitation: {$a->name} session in {$a->course_fullname}';
 $string['guest_invitation_small_message'] = 'Hi,
 
-You are invited to a BigBlueButton session {$a->name} in the course  {$a->course_fullname}.
+You are invited to a BigBlueButton session {$a->name} in the course {$a->course_fullname}.
 
 Link: {$a->guestjoinurl}
 Password: {$a->guestpassword}
 
 If you need help, please contact {$a->sender}.';
 $string['guest_invitation_full_message'] = 'Hi,
-<p>You are invited to a BigBlueButton session <strong>{$a->name}</strong> in the course  {$a->course_fullname}.</p>
+<p>You are invited to a BigBlueButton session <strong>{$a->name}</strong> in the course {$a->course_fullname}.</p>
 <p>Link: {$a->guestjoinurl}<br/>
 <p>Password: {$a->guestpassword}</p>
 <p>If you need help, please contact {$a->sender}.</p>';
@@ -430,7 +431,7 @@ $string['view_error_unable_join'] = 'Unable to enter the room. Please check the 
 $string['view_error_bigbluebutton'] = 'BigBlueButton responded with errors. {$a}';
 $string['view_error_create'] = 'The BigBlueButton server responded with an error message. The room could not be created.';
 $string['view_error_max_concurrent'] = 'The number of concurrent sessions allowed has been reached.';
-$string['view_error_userlimit_reached'] = 'The number of users allowed in a session has been reached.';
+$string['view_error_userlimit_reached'] = 'The limit of how many users allowed in a session has been reached.';
 $string['view_error_url_missing_parameters'] = 'There are parameters missing in this URL';
 $string['view_error_import_no_courses'] = 'There are no courses to look up for recordings.';
 $string['view_error_import_no_recordings'] = 'There are no recordings in this course for importing.';
@@ -512,6 +513,7 @@ $string['view_message_conference_not_started'] = 'The session has not started ye
 $string['view_message_conference_wait_for_moderator'] = 'Waiting for a moderator to join.';
 $string['view_message_conference_in_progress'] = 'The session is in progress.';
 $string['view_message_conference_has_ended'] = 'The session has ended.';
+$string['view_message_conference_user_limit_reached'] = 'The limit of how many users allowed in a session has been reached.';
 $string['view_message_tab_close'] = 'This tab/window must be closed manually';
 $string['view_message_recordings_disabled'] = 'Recordings are disabled on the server. BigBlueButton activities of type \'Recordings only\' cannot be used.';
 $string['view_message_cron_disabled'] = 'The list of recordings may not be up to date. Please contact the site administrator with the following information: {$a}';
@@ -642,6 +644,7 @@ $string['cachedef_serverinfo'] = 'Remote server information';
 $string['cachedef_recordings'] = 'Recording metadata';
 $string['cachedef_validatedurls'] = 'Cache of validated URL checks';
 $string['taskname:check_pending_recordings'] = 'Fetch pending recordings';
+$string['taskname:check_dismissed_recordings'] = 'Check for recordings that haven\'t been found yet';
 $string['userlimitreached'] = 'The number of users allowed in a session has been reached.';
 $string['waitformoderator'] = 'Waiting for a moderator to join.';
 
