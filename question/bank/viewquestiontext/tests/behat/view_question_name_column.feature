@@ -38,4 +38,4 @@ Feature: Use the qbank plugin manager page for viewquestiontext
     Given the following config values are set as admin:
       | disabled | 1 | qbank_viewquestiontext |
     When I am on the "Test quiz" "mod_quiz > question bank" page logged in as admin
-    Then I should not see "Show question text in the question list"
+    Then I should not see "Show question text in the question list?"

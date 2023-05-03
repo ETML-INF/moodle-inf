@@ -18,8 +18,6 @@ namespace mod_quiz;
 
 use core_question\local\bank\question_version_status;
 use question_engine;
-use quiz;
-use quiz_attempt;
 
 defined('MOODLE_INTERNAL') || die();
 
@@ -54,7 +52,7 @@ class attempt_test extends \advanced_testcase {
         $quiz = $quizgenerator->create_instance(['course' => $course->id,
             'grade' => 100.0, 'sumgrades' => 2, 'layout' => $layout, 'navmethod' => $navmethod]);
 
-        $quizobj = quiz::create($quiz->id, $user->id);
+        $quizobj = quiz_settings::create($quiz->id, $user->id);
 
 
         $quba = question_engine::make_questions_usage_by_activity('mod_quiz', $quizobj->get_context());
@@ -291,8 +289,8 @@ class attempt_test extends \advanced_testcase {
         $course = $this->getDataGenerator()->create_course();
         $student = $this->getDataGenerator()->create_and_enrol($course, 'student');
         $student2 = $this->getDataGenerator()->create_and_enrol($course, 'student', [], 'manual', 0, 0, ENROL_USER_SUSPENDED);
-        $quiz = $this->getDataGenerator()->create_module('quiz', array('course' => $course->id));
-        $quizobj = quiz::create($quiz->id);
+        $quiz = $this->getDataGenerator()->create_module('quiz', ['course' => $course->id]);
+        $quizobj = quiz_settings::create($quiz->id);
 
         // Login as student.
         $this->setUser($student);
@@ -340,7 +338,7 @@ class attempt_test extends \advanced_testcase {
         $question = $questiongenerator->create_question('shortanswer', null, ['category' => $cat->id]);
         quiz_add_quiz_question($question->id, $quiz, 1);
 
-        $quizobj = quiz::create($quiz->id);
+        $quizobj = quiz_settings::create($quiz->id);
 
         // Login as student1.
         $this->setUser($student1);
@@ -457,7 +455,7 @@ class attempt_test extends \advanced_testcase {
                 ['category' => $cat->id, 'status' => question_version_status::QUESTION_STATUS_DRAFT]);
         quiz_add_quiz_question($question->id, $quiz, 1);
 
-        $quizobj = quiz::create($quiz->id);
+        $quizobj = quiz_settings::create($quiz->id);
         $quba = question_engine::make_questions_usage_by_activity('mod_quiz', $quizobj->get_context());
         $quba->set_preferred_behaviour($quizobj->get_quiz()->preferredbehaviour);
         $attempt = quiz_create_attempt($quizobj, 1, false, time(), false, $student1->id);
@@ -490,7 +488,7 @@ class attempt_test extends \advanced_testcase {
         $question = $questiongenerator->create_question('shortanswer', null, ['category' => $cat->id]);
         quiz_add_quiz_question($question->id, $quiz, 1);
 
-        $quizobj = quiz::create($quiz->id);
+        $quizobj = quiz_settings::create($quiz->id);
         $quba = question_engine::make_questions_usage_by_activity('mod_quiz', $quizobj->get_context());
         $quba->set_preferred_behaviour($quizobj->get_quiz()->preferredbehaviour);
         $attempt = quiz_create_attempt($quizobj, 1, false, time(), false, $student1->id);
@@ -499,7 +497,7 @@ class attempt_test extends \advanced_testcase {
 
         $DB->set_field('question_versions', 'status', question_version_status::QUESTION_STATUS_DRAFT,
                 ['questionid' => $question->id]);
-        $quizobj = quiz::create($quiz->id);
+        $quizobj = quiz_settings::create($quiz->id);
         $quba = question_engine::make_questions_usage_by_activity('mod_quiz', $quizobj->get_context());
         $quba->set_preferred_behaviour($quizobj->get_quiz()->preferredbehaviour);
         $newattempt = quiz_create_attempt($quizobj, 2, $attempt, time(), false, $student1->id);

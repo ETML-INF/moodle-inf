@@ -124,8 +124,6 @@ $string['type_cachestore'] = 'Cache store';
 $string['type_cachestore_plural'] = 'Cache stores';
 $string['type_calendartype'] = 'Calendar type';
 $string['type_calendartype_plural'] = 'Calendar types';
-$string['type_contentbank'] = 'Content bank';
-$string['type_contentbank_plural'] = 'Content bank plugins';
 $string['type_contenttype'] = 'Content bank';
 $string['type_contenttype_plural'] = 'Content bank plugins';
 $string['type_customfield'] = 'Custom field';
@@ -258,3 +256,7 @@ $string['validationmsglevel_warning'] = 'Warning';
 $string['version'] = 'Version';
 $string['versiondb'] = 'Current version';
 $string['versiondisk'] = 'New version';
+
+// Deprecated since Moodle 4.2.
+$string['type_contentbank'] = 'Content bank';
+$string['type_contentbank_plural'] = 'Content bank plugins';
