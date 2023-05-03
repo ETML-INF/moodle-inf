@@ -15,6 +15,8 @@ DB_BACKUP_DIRECTORY="pre-deploy-backups"
 
 MOODLE_UPGRADE_LOG="moodle-upgrade-$(date +%d.%m.%Y-%Hh%Mm%Ss).log"
 
+PHP=/opt/php81/bin/php
+
 #Create also backup directory if needed
 if [ ! -d $DB_BACKUP_DIRECTORY ]; then
   mkdir ${DB_BACKUP_DIRECTORY}
@@ -51,13 +53,13 @@ function deploy()
 {
   reviewAndDelay
 
-  echo -e "Moodle OFFLINE\n" &&  php admin/cli/maintenance.php --enable && \
+  echo -e "Moodle OFFLINE\n" &&  $PHP admin/cli/maintenance.php --enable && \
   echo -e "Backup DB\n" && mysqldump --add-drop-table -h "$DB_PROD_HOST" -u "$DB_PROD_USER" --password="$DB_PROD_PASSWORD" "$DB_PROD_NAME" | \
     gzip -v > ${DB_BACKUP_DIRECTORY}/moodle-pre-deploy-$(date +%d.%m.%Y-%Hh%Mm%Ss).sql.gz && \
   echo -e "Git merge\n" && git merge --ff-only "$SHA" && \
   echo -e "Git Submodule update\n" &&  bash ./scripts/git-sub-update-init.sh && \
-  echo -e "Moodle upgrade\n" &&  php admin/cli/upgrade.php --non-interactive --verbose-settings > "$MOODLE_UPGRADE_LOG"  2>&1 && cat "$MOODLE_UPGRADE_LOG" && \
-  echo -e "Moodle ONLINE\n" &&  php admin/cli/maintenance.php --disable && echo -e "\n\nYuhuuu ;-)"
+  echo -e "Moodle upgrade\n" &&  $PHP admin/cli/upgrade.php --non-interactive --verbose-settings > "$MOODLE_UPGRADE_LOG"  2>&1 && cat "$MOODLE_UPGRADE_LOG" && \
+  echo -e "Moodle ONLINE\n" &&  $PHP admin/cli/maintenance.php --disable && echo -e "\n\nYuhuuu ;-)"
 }
 ##END MAIN BUSINESS
 
