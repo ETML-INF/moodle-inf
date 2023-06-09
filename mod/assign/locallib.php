@@ -4332,9 +4332,11 @@ class assign {
      * @return string
      */
     protected function view_remove_submission_confirm() {
-        global $USER;
+        global $USER, $PAGE;
 
         $userid = optional_param('userid', $USER->id, PARAM_INT);
+
+        $PAGE->set_pagelayout('standard');
 
         if (!$this->can_edit_submission($userid, $USER->id)) {
             throw new \moodle_exception('nopermission');
@@ -4542,7 +4544,10 @@ class assign {
                                  'context'=>$this->get_context(),
                                  'markingworkflow'=>$markingworkflow,
                                  'markingallocation'=>$markingallocation);
-        $classoptions = array('class'=>'gradingbatchoperationsform');
+        $classoptions = [
+            'class' => 'gradingbatchoperationsform',
+            'data-double-submit-protection' => 'off',
+        ];
 
         $gradingbatchoperationsform = new mod_assign_grading_batch_operations_form(null,
                                                                                    $batchformparams,
@@ -5020,7 +5025,11 @@ class assign {
                                  'context'=>$this->get_context(),
                                  'markingworkflow'=>$this->get_instance()->markingworkflow,
                                  'markingallocation'=>$markingallocation);
-        $formclasses = array('class'=>'gradingbatchoperationsform');
+        $formclasses = [
+            'class' => 'gradingbatchoperationsform',
+            'data-double-submit-protection' => 'off'
+        ];
+
         $mform = new mod_assign_grading_batch_operations_form(null,
                                                               $batchformparams,
                                                               'post',
@@ -5226,9 +5235,11 @@ class assign {
      * @return string
      */
     protected function check_submit_for_grading($mform) {
-        global $USER, $CFG;
+        global $USER, $CFG, $PAGE;
 
         require_once($CFG->dirroot . '/mod/assign/submissionconfirmform.php');
+
+        $PAGE->set_pagelayout('standard');
 
         // Check that all of the submission plugins are ready for this submission.
         // Also check whether there is something to be submitted as well against atleast one.
