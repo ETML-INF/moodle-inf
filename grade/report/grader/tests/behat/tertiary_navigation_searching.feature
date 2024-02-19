@@ -1,4 +1,4 @@
-@core @javascript @gradereport @gradereport_grader
+@core @core_grades @javascript @gradereport @gradereport_grader
 Feature: Within the grader report, test that we can search for users
   In order to find specific users in the course gradebook
   As a teacher
@@ -30,9 +30,8 @@ Feature: Within the grader report, test that we can search for users
       | assign   | C1     | a1       | Test assignment one |
     And the following config values are set as admin:
       | showuseridentity | idnumber,email,city,country,phone1,phone2,department,institution |
-    And I am on the "Course 1" "Course" page logged in as "teacher1"
+    And I am on the "Course 1" "grades > Grader report > View" page logged in as "teacher1"
     And I change window size to "large"
-    And I navigate to "View > Grader report" in the course gradebook
 
   Scenario: A teacher can view and trigger the user search
     # Check the placeholder text
@@ -78,14 +77,14 @@ Feature: Within the grader report, test that we can search for users
     And I wait until the page is ready
     And the following should exist in the "user-grades" table:
       | -1-                |
-      | Turtle Manatee     |
+      | Dummy User         |
     And the following should not exist in the "user-grades" table:
       | -1-                |
       | Teacher 1          |
       | Student 1          |
       | User Example       |
       | User Test          |
-      | Dummy User         |
+      | Turtle Manatee     |
 
     # Case: No users found.
     When I set the field "Search users" to "Plagiarism"
@@ -93,14 +92,14 @@ Feature: Within the grader report, test that we can search for users
     # Table remains unchanged as the user had no results to select from the dropdown.
     And the following should exist in the "user-grades" table:
       | -1-                |
-      | Turtle Manatee     |
+      | Dummy User         |
     And the following should not exist in the "user-grades" table:
       | -1-                |
       | Teacher 1          |
       | Student 1          |
       | User Example       |
       | User Test          |
-      | Dummy User         |
+      | Turtle Manatee     |
 
     # Case: Multiple users found and select only one result.
     Then I set the field "Search users" to "User"
@@ -223,17 +222,18 @@ Feature: Within the grader report, test that we can search for users
     And "User Example" "list_item" should exist in the ".user-search" "css_element"
     And "User Test" "list_item" should exist in the ".user-search" "css_element"
     And "Student 1" "list_item" should exist in the ".user-search" "css_element"
+    And I press the down key
     And I press the enter key
-    And I wait until the page is ready
+    And I wait "1" seconds
     And the following should exist in the "user-grades" table:
       | -1-                |
       | Student 1          |
+    And the following should not exist in the "user-grades" table:
+      | -1-                |
       | User Example       |
       | User Test          |
       | Dummy User         |
       | Turtle Manatee     |
-    And the following should not exist in the "user-grades" table:
-      | -1-                |
       | Teacher 1          |
 
   @accessibility
@@ -243,9 +243,8 @@ Feature: Within the grader report, test that we can search for users
     And the page should meet "wcag131, wcag141, wcag412" accessibility standards
     And the page should meet accessibility standards with "wcag131, wcag141, wcag412" extra tests
     # Move onto general keyboard navigation testing.
-    And I press the tab key
-    And the focused element is "Search users" "field"
     When I set the field "Search users" to "ABC"
+    And the focused element is "Search users" "field"
     And I wait until "Turtle Manatee" "option_role" exists
     And I press the down key
     And the focused element is "Student 1" "option_role"
@@ -281,7 +280,14 @@ Feature: Within the grader report, test that we can search for users
     # Ensure we can interact with the input & clear search options with the keyboard.
     # Space & Enter have the same handling for triggering the two functionalities.
     And I set the field "Search users" to "User"
-    And I click on ".usersearchwidget [data-action=search]" "css_element"
+    And I wait until "View all results (3)" "option_role" exists
+    # Tab to Clear search input.
+    And I press the tab key
+    And the focused element is "Clear search input" "button"
+    # Tab to View all results.
+    And I press the tab key
+    And the focused element is "View all results (3)" "option_role"
+    # Activate View all results.
     And I press the enter key
     And I wait to be redirected
     And the following should exist in the "user-grades" table:
@@ -342,3 +348,87 @@ Feature: Within the grader report, test that we can search for users
     # One of the users' phone numbers also matches.
     And I wait until "View all results (2)" "link" exists
     Then "Student s42" "list_item" should exist in the ".user-search" "css_element"
+
+  Scenario: As a teacher I save grades using search and pagination
+    Given "42" "users" exist with the following data:
+      | username  | students[count]             |
+      | firstname | Student                     |
+      | lastname  | test[count]                 |
+      | email     | students[count]@example.com |
+    And "42" "course enrolments" exist with the following data:
+      | user   | students[count] |
+      | course | C1              |
+      | role   |student          |
+    And I reload the page
+    And I turn editing mode on
+    And the field "perpage" matches value "20"
+    And I click on "Last name" "link"
+    And I wait until the page is ready
+    # Search for a single user on second page and save grades.
+    When I set the field "Search users" to "test32"
+    And I wait until "View all results (1)" "link" exists
+    And I click on "Student test32" "option_role"
+    And I wait until the page is ready
+    And I give the grade "80.00" to the user "Student test32" for the grade item "Test assignment one"
+    And I press "Save changes"
+    And I wait until the page is ready
+    Then the field "Search users" matches value "test32"
+    And the following should exist in the "user-grades" table:
+      | -1-                   |
+      | Student test32        |
+    And I set the field "Search users" to "test3"
+    And I click on "Student test31" "option_role"
+    And I wait until the page is ready
+    And I give the grade "70.00" to the user "Student test31" for the grade item "Test assignment one"
+    And I press "Save changes"
+    And I wait until the page is ready
+    Then the field "Search users" matches value "test3"
+    And the following should exist in the "user-grades" table:
+      | -1-                   |
+      | Student test31        |
+    And the following should not exist in the "user-grades" table:
+      | -1-                   |
+      | Student test32        |
+    And I click on "Clear" "link" in the ".user-search" "css_element"
+    And I wait until the page is ready
+    And the following should not exist in the "user-grades" table:
+      | -1-                   |
+      | Student test32        |
+    And I click on "2" "link" in the ".stickyfooter .pagination" "css_element"
+    And I wait until the page is ready
+    And the following should exist in the "user-grades" table:
+      | -1-                   |
+      | Student test31        |
+      | Student test32        |
+    # Set grade for a single user on second page without search and save grades.
+    And I give the grade "70.00" to the user "Student test31" for the grade item "Test assignment one"
+    And I press "Save changes"
+    And I wait until the page is ready
+    # We are still on second page.
+    And the following should exist in the "user-grades" table:
+      | -1-                   |
+      | Student test31        |
+      | Student test32        |
+    # Search for multiple users on second page and save grades.
+    And I set the field "Search users" to "test3"
+    And I wait until "View all results (11)" "link" exists
+    And I click on "View all results (11)" "option_role"
+    And I wait until the page is ready
+    And I give the grade "10.00" to the user "Student test32" for the grade item "Test assignment one"
+    And I give the grade "20.00" to the user "Student test30" for the grade item "Test assignment one"
+    And I give the grade "30.00" to the user "Student test31" for the grade item "Test assignment one"
+    And I give the grade "40.00" to the user "Student test3" for the grade item "Test assignment one"
+    And I press "Save changes"
+    And I wait until the page is ready
+    Then the field "Search users" matches value "test3"
+    And the following should exist in the "user-grades" table:
+      | -1-                   |
+      | Student test3         |
+      | Student test30        |
+      | Student test31        |
+      | Student test32        |
+    And the following should not exist in the "user-grades" table:
+      | -1-                   |
+      | Student test1         |
+      | Student test2         |
+      | Student test4         |

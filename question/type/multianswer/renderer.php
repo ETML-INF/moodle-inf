@@ -183,11 +183,11 @@ abstract class qtype_multianswer_subq_renderer_base extends qtype_renderer {
         }
 
         $subfraction = '';
-        if ($options->marks >= question_display_options::MARK_AND_MAX && $subq->maxmark > 0
+        if ($options->marks >= question_display_options::MARK_AND_MAX && $subq->defaultmark > 0
                 && (!is_null($fraction) || $feedback)) {
             $a = new stdClass();
-            $a->mark = format_float($fraction * $subq->maxmark, $options->markdp);
-            $a->max = format_float($subq->maxmark, $options->markdp);
+            $a->mark = format_float($fraction * $subq->defaultmark, $options->markdp);
+            $a->max = format_float($subq->defaultmark, $options->markdp);
             $feedback[] = get_string('markoutofmax', 'question', $a);
         }
 
@@ -208,19 +208,22 @@ abstract class qtype_multianswer_subq_renderer_base extends qtype_renderer {
      * @return string
      */
     protected function get_feedback_image(string $icon, string $feedbackcontents): string {
+        global $PAGE;
         if ($icon === '') {
             return '';
         }
 
+        $PAGE->requires->js_call_amd('qtype_multianswer/feedback', 'initPopovers');
+
         return html_writer::link('#', $icon, [
             'role' => 'button',
             'tabindex' => 0,
-            'class' => 'btn btn-link p-0',
+            'class' => 'feedbacktrigger btn btn-link p-0',
             'data-toggle' => 'popover',
             'data-container' => 'body',
             'data-content' => $feedbackcontents,
             'data-placement' => 'right',
-            'data-trigger' => 'focus',
+            'data-trigger' => 'hover focus',
             'data-html' => 'true',
         ]);
     }
@@ -483,10 +486,10 @@ class qtype_multianswer_multichoice_vertical_renderer extends qtype_multianswer_
 
         $feedback = array();
         if ($options->feedback && $options->marks >= question_display_options::MARK_AND_MAX &&
-                $subq->maxmark > 0) {
+                $subq->defaultmark > 0) {
             $a = new stdClass();
-            $a->mark = format_float($fraction * $subq->maxmark, $options->markdp);
-            $a->max = format_float($subq->maxmark, $options->markdp);
+            $a->mark = format_float($fraction * $subq->defaultmark, $options->markdp);
+            $a->max = format_float($subq->defaultmark, $options->markdp);
 
             $feedback[] = html_writer::tag('div', get_string('markoutofmax', 'question', $a));
         }
@@ -675,10 +678,10 @@ class qtype_multianswer_multiresponse_vertical_renderer extends qtype_multianswe
 
         $feedback = array();
         if ($options->feedback && $options->marks >= question_display_options::MARK_AND_MAX &&
-            $subq->maxmark > 0) {
+            $subq->defaultmark > 0) {
             $a = new stdClass();
-            $a->mark = format_float($fraction * $subq->maxmark, $options->markdp);
-            $a->max = format_float($subq->maxmark, $options->markdp);
+            $a->mark = format_float($fraction * $subq->defaultmark, $options->markdp);
+            $a->max = format_float($subq->defaultmark, $options->markdp);
 
             $feedback[] = html_writer::tag('div', get_string('markoutofmax', 'question', $a));
         }

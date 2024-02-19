@@ -152,6 +152,13 @@ function h5pactivity_delete_instance(int $id): bool {
         $xapihandler->wipe_states($context->id);
     }
 
+    // Remove activity record, and all associated attempt data.
+    $attemptids = $DB->get_fieldset_select('h5pactivity_attempts', 'id', 'h5pactivityid = ?', [$id]);
+    if ($attemptids) {
+        $DB->delete_records_list('h5pactivity_attempts_results', 'attemptid', $attemptids);
+        $DB->delete_records_list('h5pactivity_attempts', 'id', $attemptids);
+    }
+
     $DB->delete_records('h5pactivity', ['id' => $id]);
 
     h5pactivity_grade_item_delete($activity);
@@ -577,7 +584,7 @@ function h5pactivity_print_recent_activity($course, bool $viewfullnames, int $ti
               JOIN {course_modules} cm ON cm.instance = h5p.id
               JOIN {modules} md ON md.id = cm.module
               JOIN {user} u ON u.id = h5pa.userid
-             WHERE h5pa.timemodified > ?
+             WHERE h5pa.timemodified >= ?
                AND h5p.course = ?
                AND md.name = ?
           ORDER BY h5pa.timemodified ASC";
@@ -662,7 +669,7 @@ function h5pactivity_get_recent_mod_activity(array &$activities, int &$index, in
               JOIN {course_modules} cm ON cm.instance = h5p.id
               JOIN {modules} md ON md.id = cm.module
               JOIN {user} u ON u.id = h5pa.userid $groupjoin
-             WHERE h5pa.timemodified > :timestart
+             WHERE h5pa.timemodified >= :timestart
                AND h5p.id = :cminstance $userselect $groupselect
                AND cm.id = :cmid
           ORDER BY h5pa.timemodified ASC";

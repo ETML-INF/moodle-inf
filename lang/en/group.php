@@ -111,15 +111,13 @@ $string['groupmembers'] = 'Group members';
 $string['groupmemberssee'] = 'See group members';
 $string['groupmembersselected'] = 'Members of selected group';
 $string['groupmode'] = 'Group mode';
-$string['groupmode_help'] = 'This setting has 3 options:
+$string['groupmode_help'] = '* No groups
+* Separate groups: Students are divided into groups and can only see their group\'s work.
+* Visible groups: Students are divided into groups, but can see the work of other groups.
 
-* No groups
-* Separate groups - Each group member can only see their own group, others are invisible
-* Visible groups - Each group member works in their own group, but can also see other groups
-
-The group mode defined at course level is the default mode for all activities within the course. Each activity that supports groups can also define its own group mode, though if the group mode is forced at course level, the group mode setting for each activity is ignored.';
+The group mode set at course level is the default mode for all activities. If the group mode is forced at course level, it can\'t be changed in an activity.';
 $string['groupmodeforce'] = 'Force group mode';
-$string['groupmodeforce_help'] = 'If group mode is forced, then the course group mode is applied to every activity in the course. Group mode settings in each activity are then ignored.';
+$string['groupmodeforce_help'] = 'The group mode is enforced for all activities and can\'t be changed in an activity.';
 $string['groupmy'] = 'My group';
 $string['groupname'] = 'Group name';
 $string['groupnameexists'] = 'The group name \'{$a}\' already exists in this course, please choose another one.';
@@ -175,7 +173,7 @@ $string['mygroups'] = 'My groups';
 $string['othergroups'] = 'Other groups';
 $string['overview'] = 'Overview';
 $string['participation'] = 'Show group in dropdown menu for activities in group mode';
-$string['participation_help'] = 'Should group members be able to select this group for activities in separate or visible groups mode? (Only applicable if group membership is visible to everyone or only visible to members.)';
+$string['participation_help'] = 'Should group members be able to select this group for activities in separate or visible groups mode? (Only applicable if group membership is visible or only visible to members.)';
 $string['participationshort'] = 'Participation';
 $string['potentialmembers'] = 'Potential members: {$a}';
 $string['potentialmembs'] = 'Potential members';
@@ -202,7 +200,7 @@ $string['usercount'] = 'User count';
 $string['usercounttotal'] = 'User count ({$a})';
 $string['usergroupmembership'] = 'Selected user\'s membership:';
 $string['visibility'] = 'Group membership visibility';
-$string['visibility_help'] = '* Visible to everyone - all course participants can view who is in the group
+$string['visibility_help'] = '* Visible - all course participants can view who is in the group
 * Only visible to members - course participants not in the group can’t view the group or its members
 * Only see own membership - a user can see they are in the group but can’t view other group members
 * Hidden - only teachers can view the group and its members
@@ -211,7 +209,7 @@ Users with the view hidden groups capability can always view group membership.
 
 Note that you can\'t change this setting if the group has members.';
 $string['visibilityshort'] = 'Visibility';
-$string['visibilityall'] = 'Visible to everyone';
+$string['visibilityall'] = 'Visible';
 $string['visibilitymembers'] = 'Only visible to members';
 $string['visibilityown'] = 'Only see own membership';
 $string['visibilitynone'] = 'Hidden';

@@ -366,6 +366,44 @@ class externallib_test extends externallib_advanced_testcase {
     }
 
     /**
+     * Test update_categories method for moving categories
+     */
+    public function test_update_categories_moving() {
+        $this->resetAfterTest();
+
+        // Create data.
+        $categorya  = self::getDataGenerator()->create_category([
+            'name' => 'CAT_A',
+        ]);
+        $categoryasub = self::getDataGenerator()->create_category([
+            'name' => 'SUBCAT_A',
+            'parent' => $categorya->id
+        ]);
+        $categoryb  = self::getDataGenerator()->create_category([
+            'name' => 'CAT_B',
+        ]);
+
+        // Create a new test user.
+        $testuser = self::getDataGenerator()->create_user();
+        $this->setUser($testuser);
+
+        // Set the capability for CAT_A only.
+        $contextcata = context_coursecat::instance($categorya->id);
+        $roleid = $this->assignUserCapability('moodle/category:manage', $contextcata->id);
+
+        // Then we move SUBCAT_A parent: CAT_A => CAT_B.
+        $categories = [
+            [
+                'id' => $categoryasub->id,
+                'parent' => $categoryb->id
+            ]
+        ];
+
+        $this->expectException('required_capability_exception');
+        core_course_external::update_categories($categories);
+    }
+
+    /**
      * Test create_courses numsections
      */
     public function test_create_course_numsections() {
@@ -415,10 +453,12 @@ class externallib_test extends externallib_advanced_testcase {
         // Custom fields.
         $fieldcategory = self::getDataGenerator()->create_custom_field_category(['name' => 'Other fields']);
 
-        $customfield = ['shortname' => 'test', 'name' => 'Custom field', 'type' => 'text',
-            'categoryid' => $fieldcategory->get('id'),
-            'configdata' => ['visibility' => \core_course\customfield\course_handler::VISIBLETOALL]];
-        $field = self::getDataGenerator()->create_custom_field($customfield);
+        $fieldtext = self::getDataGenerator()->create_custom_field([
+            'categoryid' => $fieldcategory->get('id'), 'name' => 'Text', 'shortname' => 'text', 'type' => 'text',
+        ]);
+        $fieldtextarea = self::getDataGenerator()->create_custom_field([
+            'categoryid' => $fieldcategory->get('id'), 'name' => 'Textarea', 'shortname' => 'textarea', 'type' => 'textarea',
+        ]);
 
         // Set the required capabilities by the external function
         $contextid = context_system::instance()->id;
@@ -470,7 +510,10 @@ class externallib_test extends externallib_advanced_testcase {
         $course4['fullname'] = 'Test course with custom fields';
         $course4['shortname'] = 'Testcoursecustomfields';
         $course4['categoryid'] = $category->id;
-        $course4['customfields'] = [['shortname' => $customfield['shortname'], 'value' => 'Test value']];
+        $course4['customfields'] = [
+            ['shortname' => $fieldtext->get('shortname'), 'value' => 'And I want to tell you so much'],
+            ['shortname' => $fieldtextarea->get('shortname'), 'value' => 'I love you'],
+        ];
         $courses = array($course4, $course1, $course2, $course3);
 
         $createdcourses = core_course_external::create_courses($courses);
@@ -542,7 +585,10 @@ class externallib_test extends externallib_advanced_testcase {
 
                 $handler = core_course\customfield\course_handler::create();
                 $customfields = $handler->export_instance_data_object($createdcourse['id']);
-                $this->assertEquals((object)['test' => 'Test value'], $customfields);
+                $this->assertEquals((object) [
+                    'text' => 'And I want to tell you so much',
+                    'textarea' => '<div class="text_to_html">I love you</div>',
+                ], $customfields);
             } else {
                 throw new moodle_exception('Unexpected shortname');
             }
@@ -1819,12 +1865,17 @@ class externallib_test extends externallib_advanced_testcase {
 
         // Course with custom fields.
         $fieldcategory = self::getDataGenerator()->create_custom_field_category(['name' => 'Other fields']);
-        $customfield = ['shortname' => 'test', 'name' => 'Custom field', 'type' => 'text',
-            'categoryid' => $fieldcategory->get('id'),
-            'configdata' => ['visibility' => \core_course\customfield\course_handler::VISIBLETOALL, 'locked' => 1]];
-        $field = self::getDataGenerator()->create_custom_field($customfield);
 
-        $originalcourse3 = self::getDataGenerator()->create_course(['customfield_test' => 'Test value']);
+        $fieldtext = self::getDataGenerator()->create_custom_field([
+            'categoryid' => $fieldcategory->get('id'), 'name' => 'Text', 'shortname' => 'text', 'type' => 'text', 'configdata' => [
+                'locked' => 1,
+            ],
+        ]);
+        $fieldtextarea = self::getDataGenerator()->create_custom_field([
+            'categoryid' => $fieldcategory->get('id'), 'name' => 'Textarea', 'shortname' => 'textarea', 'type' => 'textarea',
+        ]);
+
+        $originalcourse3 = self::getDataGenerator()->create_course();
         self::getDataGenerator()->enrol_user($USER->id, $originalcourse3->id, $roleid);
 
         // Course values to be updated.
@@ -1857,8 +1908,11 @@ class externallib_test extends externallib_advanced_testcase {
         $course2['forcetheme'] = 'classic';
 
         $course3['id'] = $originalcourse3->id;
-        $updatedcustomfieldvalue = ['shortname' => 'test', 'value' => 'Updated test value'];
-        $course3['customfields'] = [$updatedcustomfieldvalue];
+        $course3['customfields'] = [
+            ['shortname' => $fieldtext->get('shortname'), 'value' => 'I long to see the sunlight in your hair'],
+            ['shortname' => $fieldtextarea->get('shortname'), 'value' => 'And tell you time and time again'],
+         ];
+
         $courses = array($course1, $course2, $course3);
 
         $updatedcoursewarnings = core_course_external::update_courses($courses);
@@ -1899,7 +1953,10 @@ class externallib_test extends externallib_advanced_testcase {
                 }
 
                 $this->assertEquals($course2['enablecompletion'], $courseinfo->enablecompletion);
-                $this->assertEquals(['test' => null], (array)$customfields);
+                $this->assertEquals((object) [
+                    'text' => null,
+                    'textarea' => null,
+                ], $customfields);
             } else if ($course['id'] == $course1['id']) {
                 $this->assertEquals($course1['fullname'], $courseinfo->fullname);
                 $this->assertEquals($course1['shortname'], $courseinfo->shortname);
@@ -1909,9 +1966,15 @@ class externallib_test extends externallib_advanced_testcase {
                 $this->assertEquals(5, course_get_format($course['id'])->get_last_section_number());
                 $this->assertEquals(0, $courseinfo->newsitems);
                 $this->assertEquals(FORMAT_MOODLE, $courseinfo->summaryformat);
-                $this->assertEquals(['test' => null], (array)$customfields);
+                $this->assertEquals((object) [
+                    'text' => null,
+                    'textarea' => null,
+                ], $customfields);
             } else if ($course['id'] == $course3['id']) {
-                $this->assertEquals(['test' => $updatedcustomfieldvalue['value']], (array)$customfields);
+                $this->assertEquals((object) [
+                    'text' => 'I long to see the sunlight in your hair',
+                    'textarea' => '<div class="text_to_html">And tell you time and time again</div>',
+                ], $customfields);
             } else {
                 throw new moodle_exception('Unexpected shortname');
             }
@@ -2049,14 +2112,18 @@ class externallib_test extends externallib_advanced_testcase {
         $this->setUser($user);
         self::getDataGenerator()->enrol_user($user->id, $course3['id'], $roleid);
 
-        $newupdatedcustomfieldvalue = ['shortname' => 'test', 'value' => 'New updated value'];
-        $course3['customfields'] = [$newupdatedcustomfieldvalue];
+        $course3['customfields'] = [
+            ['shortname' => 'text', 'value' => 'New updated value'],
+        ];
 
         core_course_external::update_courses([$course3]);
 
         // Custom field was not updated.
         $customfields = \core_course\customfield\course_handler::create()->export_instance_data_object($course3['id']);
-        $this->assertEquals(['test' => $updatedcustomfieldvalue['value']], (array)$customfields);
+        $this->assertEquals((object) [
+            'text' => 'I long to see the sunlight in your hair',
+            'textarea' => '<div class="text_to_html">And tell you time and time again</div>',
+        ], $customfields);
     }
 
     /**

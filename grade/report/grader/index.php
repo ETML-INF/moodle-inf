@@ -33,7 +33,7 @@ $page          = optional_param('page', 0, PARAM_INT);   // active page
 $edit          = optional_param('edit', -1, PARAM_BOOL); // sticky editting mode
 
 $sortitemid    = optional_param('sortitemid', 0, PARAM_ALPHANUMEXT);
-$sort          = optional_param('sort', '', PARAM_TEXT);
+$sort          = optional_param('sort', '', PARAM_ALPHA);
 $action        = optional_param('action', 0, PARAM_ALPHAEXT);
 $move          = optional_param('move', 0, PARAM_INT);
 $type          = optional_param('type', 0, PARAM_ALPHA);
@@ -116,16 +116,17 @@ if (!empty($target) && !empty($action) && confirm_sesskey()) {
     grade_report_grader::do_process_action($target, $action, $courseid);
 }
 
-$reportname = get_string('pluginname', 'gradereport_grader');
-
 // Do this check just before printing the grade header (and only do it once).
 grade_regrade_final_grades_if_required($course);
 
 //Initialise the grader report object that produces the table
 //the class grade_report_grader_ajax was removed as part of MDL-21562
-if ($sort) {
-    $sort = strtoupper($sort);
+if ($sort && strcasecmp($sort, 'desc') !== 0) {
+    $sort = 'asc';
 }
+// We have lots of hardcoded 'ASC' and 'DESC' strings in grade/report/grader.lib :(. So we need to uppercase the sort.
+$sort = strtoupper($sort);
+
 $report = new grade_report_grader($courseid, $gpr, $context, $page, $sortitemid, $sort);
 
 // We call this a little later since we need some info from the grader report.
@@ -138,7 +139,7 @@ $PAGE->requires->js_call_amd('gradereport_grader/collapse', 'init', [
 $numusers = $report->get_numusers(true, true);
 
 $actionbar = new \gradereport_grader\output\action_bar($context, $report, $numusers);
-print_grade_page_head($COURSE->id, 'report', 'grader', $reportname, false, $buttons, true,
+print_grade_page_head($COURSE->id, 'report', 'grader', false, false, $buttons, true,
     null, null, null, $actionbar, false);
 
 // make sure separate group does not prevent view

@@ -1116,6 +1116,9 @@ class single_select implements renderable, templatable {
      */
     var $helpicon = null;
 
+    /** @var component_action[] component action. */
+    public $actions = [];
+
     /**
      * Constructor
      * @param moodle_url $url form action target, includes hidden fields
@@ -2036,16 +2039,19 @@ class html_writer {
      * @param int $currenttime A default timestamp in GMT
      * @param int $step minute spacing
      * @param array $attributes - html select element attributes
-     * @return HTML fragment
+     * @param float|int|string $timezone the timezone to use to calculate the time
+     *        {@link https://moodledev.io/docs/apis/subsystems/time#timezone}
+     * @return string HTML fragment
      */
-    public static function select_time($type, $name, $currenttime = 0, $step = 5, array $attributes = null) {
+    public static function select_time($type, $name, $currenttime = 0, $step = 5, array $attributes = null, $timezone = 99) {
         global $OUTPUT;
 
         if (!$currenttime) {
             $currenttime = time();
         }
         $calendartype = \core_calendar\type_factory::get_calendar_instance();
-        $currentdate = $calendartype->timestamp_to_date_array($currenttime);
+        $currentdate = $calendartype->timestamp_to_date_array($currenttime, $timezone);
+
         $userdatetype = $type;
         $timeunits = array();
 
@@ -2865,6 +2871,9 @@ class html_table {
 
     /** @var bool Whether to make the table to be scrolled horizontally with ease. Make table responsive across all viewports. */
     public $responsive = true;
+
+    /** @var string class name to add to this html table. */
+    public $class;
 
     /**
      * Constructor
@@ -4337,6 +4346,12 @@ class action_menu implements renderable, templatable {
     public $menutrigger = '';
 
     /**
+     * An array of attributes added to the trigger element of the secondary menu.
+     * @var array
+     */
+    public $triggerattributes = [];
+
+    /**
      * Any extra classes for toggling to the secondary menu.
      * @var string
      */
@@ -4649,6 +4664,22 @@ class action_menu implements renderable, templatable {
     }
 
     /**
+     * Set the overflow constraint boundary of the dropdown menu.
+     * @see https://getbootstrap.com/docs/4.6/components/dropdowns/#options The 'boundary' option in the Bootstrap documentation
+     *
+     * @param string $boundary Accepts the values of 'viewport', 'window', or 'scrollParent'.
+     * @throws coding_exception
+     */
+    public function set_boundary(string $boundary) {
+        if (!in_array($boundary, ['viewport', 'window', 'scrollParent'])) {
+            throw new coding_exception("HTMLElement reference boundaries are not supported." .
+                "Accepted boundaries are 'viewport', 'window', or 'scrollParent'.", DEBUG_DEVELOPER);
+        }
+
+        $this->triggerattributes['data-boundary'] = $boundary;
+    }
+
+    /**
      * If you call this method the action menu will be displayed but will not be enhanced.
      *
      * By not displaying the menu enhanced all items will be displayed in a single row.
@@ -4745,6 +4776,9 @@ class action_menu implements renderable, templatable {
         $primary->attributes = array_map(function($key, $value) {
             return [ 'name' => $key, 'value' => $value ];
         }, array_keys($attributesprimary), $attributesprimary);
+        $primary->triggerattributes = array_map(function($key, $value) {
+            return [ 'name' => $key, 'value' => $value ];
+        }, array_keys($this->triggerattributes), $this->triggerattributes);
 
         $actionicon = $this->actionicon;
         if (!empty($this->menutrigger)) {
@@ -5157,7 +5191,7 @@ class progress_bar implements renderable, templatable {
         $this->percent = $percent;
         $this->lastupdate = microtime(true);
 
-        echo $OUTPUT->render_progress_bar_update($this->html_id, sprintf("%.1f", $this->percent), $msg, $estimatemsg);
+        echo $OUTPUT->render_progress_bar_update($this->html_id, $this->percent, $msg, $estimatemsg);
         flush();
     }
 

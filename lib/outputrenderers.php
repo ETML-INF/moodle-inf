@@ -181,10 +181,10 @@ class renderer_base {
     public function render_from_template($templatename, $context) {
         $mustache = $this->get_mustache();
 
-        try {
+        if ($mustache->hasHelper('uniqid')) {
             // Grab a copy of the existing helper to be restored later.
             $uniqidhelper = $mustache->getHelper('uniqid');
-        } catch (Mustache_Exception_UnknownHelperException $e) {
+        } else {
             // Helper doesn't exist.
             $uniqidhelper = null;
         }
@@ -841,7 +841,7 @@ class core_renderer extends renderer_base {
             $output .= $this->box_start($errorclass . ' moodle-has-zindex maintenancewarning m-3 alert');
             $a = new stdClass();
             $a->hour = (int)($timeleft / 3600);
-            $a->min = (int)(($timeleft / 60) % 60);
+            $a->min = (int)(floor($timeleft / 60) % 60);
             $a->sec = (int)($timeleft % 60);
             if ($a->hour > 0) {
                 $output .= get_string('maintenancemodeisscheduledlong', 'admin', $a);
@@ -2656,8 +2656,16 @@ class core_renderer extends renderer_base {
         $alt = '';
         if ($userpicture->alttext) {
             if (!empty($user->imagealt)) {
-                $alt = $user->imagealt;
+                $alt = trim($user->imagealt);
             }
+        }
+
+        // If the user picture is being rendered as a link but without the full name, an empty alt text for the user picture
+        // would mean that the link displayed will not have any discernible text. This becomes an accessibility issue,
+        // especially to screen reader users. Use the user's full name by default for the user picture's alt-text if this is
+        // the case.
+        if ($userpicture->link && !$userpicture->includefullname && empty($alt)) {
+            $alt = fullname($user);
         }
 
         if (empty($userpicture->size)) {
@@ -2688,8 +2696,12 @@ class core_renderer extends renderer_base {
 
         // Get the image html output first, auto generated based on initials if one isn't already set.
         if ($user->picture == 0 && empty($CFG->enablegravatar) && !defined('BEHAT_SITE_RUNNING')) {
-            $output = html_writer::tag('span', mb_substr($user->firstname, 0, 1) . mb_substr($user->lastname, 0, 1),
-                ['class' => 'userinitials size-' . $size]);
+            $initials = \core_user::get_initials($user);
+            // Don't modify in corner cases where neither the firstname nor the lastname appears.
+            $output = html_writer::tag(
+                'span', $initials,
+                ['class' => 'userinitials size-' . $size]
+            );
         } else {
             $output = html_writer::empty_tag('img', $attributes);
         }
@@ -5025,7 +5037,12 @@ EOD;
      * @return string ascii fragment
      */
     public function render_progress_bar_update(string $id, float $percent, string $msg, string $estimate) : string {
-        return html_writer::script(js_writer::function_call('updateProgressBar', [$id, $percent, $msg, $estimate]));
+        return html_writer::script(js_writer::function_call('updateProgressBar', [
+            $id,
+            round($percent, 1),
+            $msg,
+            $estimate,
+        ]));
     }
 
     /**

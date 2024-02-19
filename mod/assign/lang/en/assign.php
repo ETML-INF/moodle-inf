@@ -152,7 +152,7 @@ $string['currentattempt'] = 'This is attempt {$a}.';
 $string['currentattemptof'] = 'This is attempt {$a->attemptnumber} ( {$a->maxattempts} attempts allowed ).';
 $string['cutoffdate'] = 'Cut-off date';
 $string['cutoffdatecolon'] = 'Cut-off date: {$a}';
-$string['cutoffdate_help'] = 'If set, the assignment will not accept submissions after this date without an extension.';
+$string['cutoffdate_help'] = 'If set, submissions will not be accepted after this date without an extension. If not set, submissions will always be accepted.';
 $string['cutoffdatevalidation'] = 'Cut-off date cannot be earlier than the due date.';
 $string['cutoffdatefromdatevalidation'] = 'Cut-off date cannot be earlier than the allow submissions from date.';
 $string['defaultlayout'] = 'Restore default layout';
@@ -175,6 +175,7 @@ $string['submissionempty'] = 'Nothing was submitted';
 $string['submissionmodified'] = 'You have existing submission data. Please leave this page and try again.';
 $string['submissionmodifiedgroup'] = 'The submission has been modified by somebody else. Please leave this page and try again.';
 $string['duedatereached'] = 'The due date for this assignment has now passed';
+$string['duedateaftersubmissionvalidation'] = 'Due date must be after the allow submissions from date.';
 $string['duedatevalidation'] = 'Due date cannot be earlier than the allow submissions from date.';
 $string['editattemptfeedback'] = 'Edit the grade and feedback for attempt number {$a}.';
 $string['editonline'] = 'Edit online';
@@ -281,7 +282,7 @@ $string['filterrequiregrading'] = 'Requires grading';
 $string['filtersubmitted'] = 'Submitted';
 $string['graded'] = 'Graded';
 $string['gradedby'] = 'Graded by';
-$string['gradedfollowupsubmit'] = 'Graded - follow-up submission received';
+$string['gradedfollowupsubmit'] = 'Graded - resubmitted';
 $string['gradedon'] = 'Graded on';
 $string['gradebelowzero'] = 'Grade must be greater than or equal to zero.';
 $string['gradebreakdown'] = 'Grade breakdown';
@@ -474,7 +475,9 @@ $string['reopenuntilpassincompatiblewithblindmarking'] = 'Reopen until pass opti
 $string['requiresubmissionstatement'] = 'Require that students accept the submission statement';
 $string['requiresubmissionstatement_help'] = 'Require that students accept the submission statement for all submissions to this assignment.';
 $string['requireallteammemberssubmit'] = 'Require all group members submit';
-$string['requireallteammemberssubmit_help'] = 'If enabled, all members of the student group must click the submit button for this assignment before the group submission will be considered as submitted. If disabled, the group submission will be considered as submitted as soon as any member of the student group clicks the submit button.';
+$string['requireallteammemberssubmit_help'] = 'This setting must be used together with the \'Require students to click the submit button\' in Submission settings.
+
+If enabled, all group members must click the submit button for the group submission to be considered as submitted. If disabled, any group member can click the submit button.';
 $string['recordid'] = 'Identifier';
 $string['removesubmission'] = 'Remove submission';
 $string['removesubmissionforstudent'] = 'Remove submission for student: (id={$a->id}, fullname={$a->fullname}).';

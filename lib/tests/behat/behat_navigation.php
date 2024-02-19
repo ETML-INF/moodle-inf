@@ -620,8 +620,8 @@ class behat_navigation extends behat_base {
         $dividercount = substr_count($page, ' > ');
         if ($dividercount === 0) {
             return ['core', $page];
-        } else if ($dividercount === 1) {
-            list($component, $name) = explode(' > ', $page);
+        } else if ($dividercount >= 1) {
+            [$component, $name] = explode(' > ', $page, 2);
             if ($component === 'core') {
                 throw new coding_exception('Do not specify the component "core > ..." for core pages.');
             }
@@ -916,6 +916,63 @@ class behat_navigation extends behat_base {
     }
 
     /**
+     * Opens a new tab with given name on the same URL as current page and switches to it.
+     *
+     * @param string $name Tab name that can be used for switching later (no whitespace)
+     * @When /^I open a tab named "(?<name>[^"]*)" on the current page$/
+     */
+    public function i_open_a_tab_on_the_current_page(string $name): void {
+        $this->open_tab($name, 'location.href');
+    }
+
+    /**
+     * Opens a new tab with given name on specified page, and switches to it.
+     *
+     * @param string $name Tab name that can be used for switching later (no whitespace)
+     * @param string $page Page name
+     * @When /^I open a tab named "(?<name>[^"]*)" on the "(?<page>[^"]*)" page$/
+     */
+    public function i_open_a_tab_on_the_page(string $name, string $page): void {
+        if ($page === 'current') {
+            $jstarget = 'location.href';
+        } else {
+            $jstarget = '"' . addslashes_js($this->resolve_page_helper($page)->out(false)) . '"';
+        }
+        $this->open_tab($name, $jstarget);
+    }
+
+    /**
+     * Opens a new tab with given name (on specified page), and switches to it.
+     *
+     * @param string $name Tab name that can be used for switching later (no whitespace)
+     * @param string $identifier Page identifier
+     * @param string $page Page type
+     * @When /^I open a tab named "(?<name>[^"]*)" on the "(?<identifier>[^"]*)" "(?<page>[^"]*)" page$/
+     */
+    public function i_open_a_tab_on_the_page_instance(string $name, string $identifier, string $page): void {
+        $this->open_tab($name, '"' . addslashes_js(
+            $this->resolve_page_instance_helper($identifier, $page)->out(false)) . '"');
+    }
+
+    /**
+     * Opens a new tab at the given target URL.
+     *
+     * @param string $name Name for tab
+     * @param string $jstarget Target in JavaScript syntax, i.e. if a string, must be quoted
+     */
+    protected function open_tab(string $name, string $jstarget): void {
+        // Tab names aren't allowed spaces, and our JavaScript below doesn't do any escaping.
+        if (clean_param($name, PARAM_ALPHANUMEXT) !== $name) {
+            throw new Exception('Tab name may not contain whitespace or special characters: "' . $name . '"');
+        }
+
+        // Normally you can't open a tab unless in response to a user action, but presumably Behat
+        // is exempt from this restriction, because it works to just open it directly.
+        $this->execute_script('window.open(' . $jstarget . ', "' . $name . '");');
+        $this->execute('behat_general::switch_to_window', [$name]);
+    }
+
+    /**
      * Opens the course homepage. (Consider using 'I am on the "shortname" "Course" page' step instead.)
      *
      * @Given /^I am on "(?P<coursefullname_string>(?:[^"]|\\")*)" course homepage$/
@@ -947,22 +1004,20 @@ class behat_navigation extends behat_base {
      * @param string $onoroff Whehter to switch editing on, or off.
      */
     public function i_am_on_course_homepage_with_editing_mode_set_to(string $coursefullname, string $onoroff): void {
-        $courseid = $this->get_course_id($coursefullname);
-        $url = new moodle_url('/course/view.php', ['id' => $courseid]);
-
-        // Visit the course page.
-        $this->execute('behat_general::i_visit', [$url]);
-
-        switch ($onoroff) {
-            case 'on':
-                $this->execute('behat_navigation::i_turn_editing_mode_on');
-                break;
-            case 'off':
-                $this->execute('behat_navigation::i_turn_editing_mode_off');
-                break;
-            default:
-                throw new \coding_exception("Unknown editing mode '{$onoroff}'. Accepted values are 'on' and 'off'");
+        if ($onoroff !== 'on' && $onoroff !== 'off') {
+            throw new coding_exception("Unknown editing mode '{$onoroff}'. Accepted values are 'on' and 'off'");
         }
+
+        $courseid = $this->get_course_id($coursefullname);
+        $context = context_course::instance($courseid);
+        $courseurl = new moodle_url('/course/view.php', ['id' => $courseid]);
+
+        $editmodeurl = new moodle_url('/editmode.php', [
+            'context' => $context->id,
+            'pageurl' => $courseurl->out(true),
+            'setmode' => ($onoroff === 'on' ? 1 : 0),
+        ]);
+        $this->execute('behat_general::i_visit', [$editmodeurl]);
     }
 
     /**

@@ -189,6 +189,36 @@ class grade_grade extends grade_object {
     public $feedbackfiles = [];
 
     /**
+     * Feedback content.
+     * @var string $feedback
+     */
+    public $feedback;
+
+    /**
+     * Feedback format.
+     * @var int $feedbackformat
+     */
+    public $feedbackformat = FORMAT_PLAIN;
+
+    /**
+     * Information text.
+     * @var string $information
+     */
+    public $information;
+
+    /**
+     * Information text format.
+     * @var int $informationformat
+     */
+    public $informationformat = FORMAT_PLAIN;
+
+    /**
+     * label text.
+     * @var string $label
+     */
+    public $label;
+
+    /**
      * Returns array of grades for given grade_item+users
      *
      * @param grade_item $grade_item
@@ -1117,16 +1147,18 @@ class grade_grade extends grade_object {
      */
     public function delete($source = null) {
         global $DB;
-
-        $transaction = $DB->start_delegated_transaction();
-        $success = parent::delete($source);
-
-        // If the grade was deleted successfully trigger a grade_deleted event.
-        if ($success && !empty($this->grade_item)) {
-            \core\event\grade_deleted::create_from_grade($this)->trigger();
+        try {
+            $transaction = $DB->start_delegated_transaction();
+            $success = parent::delete($source);
+            // If the grade was deleted successfully trigger a grade_deleted event.
+            if ($success && !empty($this->grade_item)) {
+                $this->load_grade_item();
+                \core\event\grade_deleted::create_from_grade($this)->trigger();
+            }
+            $transaction->allow_commit();
+        } catch (Exception $e) {
+            $transaction->rollback($e);
         }
-
-        $transaction->allow_commit();
         return $success;
     }
 

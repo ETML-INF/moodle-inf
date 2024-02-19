@@ -287,6 +287,26 @@ Feature: Course participants can be filtered
     And I should not see "Patricia Pea" in the "participants" "table"
 
   @javascript
+  Scenario: Filter users who have not accessed a course
+    Given I am on the "C1" "Enrolled users" page logged in as "patricia"
+    When I set the field "type" in the "Filter 1" "fieldset" to "Inactive for more than"
+
+    # Everyone has accessed the course.
+    And I open the autocomplete suggestions list in the "Filter 1" "fieldset"
+    And I should not see "Never" in the ".form-autocomplete-suggestions" "css_element"
+
+    # Switch to a course which only some participants have accessed.
+    And I am on the "C2" "Enrolled users" page
+    And I set the field "type" in the "Filter 1" "fieldset" to "Inactive for more than"
+    And I set the field "Type or select..." in the "Filter 1" "fieldset" to "Never"
+    And I click on "Apply filters" "button"
+    Then I should see "Student 2" in the "participants" "table"
+    And I should see "Student 3" in the "participants" "table"
+    And I should see "Trendy Learnson" in the "participants" "table"
+    And I should not see "Student 1" in the "participants" "table"
+    And I should not see "Patricia Pea" in the "participants" "table"
+
+  @javascript
   Scenario: Multiple filters applied (All filterset match type)
     Given I am on the "C1" "Course" page logged in as "patricia"
     And I navigate to course participants
@@ -732,9 +752,10 @@ Feature: Course participants can be filtered
 
   @javascript @skip_chrome_zerosize
   Scenario: Filter by user identity fields when cannot see the field data
-    Given I log in as "admin"
-    And I set the following system permissions of "Teacher" role:
-      | moodle/site:viewuseridentity | Prevent |
+    Given the following "role capability" exists:
+      | role                         | editingteacher |
+      | moodle/site:viewuseridentity | prevent        |
+    And I log in as "admin"
     And the following config values are set as admin:
       | showuseridentity | idnumber,email,city,country |
     And I log out

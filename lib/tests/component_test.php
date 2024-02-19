@@ -33,25 +33,6 @@ class component_test extends advanced_testcase {
      */
     const SUBSYSTEMCOUNT = 76;
 
-    public function setUp(): void {
-        $psr0namespaces = new ReflectionProperty('core_component', 'psr0namespaces');
-        $psr0namespaces->setAccessible(true);
-        $this->oldpsr0namespaces = $psr0namespaces->getValue(null);
-
-        $psr4namespaces = new ReflectionProperty('core_component', 'psr4namespaces');
-        $psr4namespaces->setAccessible(true);
-        $this->oldpsr4namespaces = $psr4namespaces->getValue(null);
-    }
-    public function tearDown(): void {
-        $psr0namespaces = new ReflectionProperty('core_component', 'psr0namespaces');
-        $psr0namespaces->setAccessible(true);
-        $psr0namespaces->setValue(null, $this->oldpsr0namespaces);
-
-        $psr4namespaces = new ReflectionProperty('core_component', 'psr4namespaces');
-        $psr4namespaces->setAccessible(true);
-        $psr4namespaces->setValue(null, $this->oldpsr4namespaces);
-    }
-
     public function test_get_core_subsystems() {
         global $CFG;
 
@@ -620,6 +601,7 @@ class component_test extends advanced_testcase {
      * @param array $psr4 The PSR-4 namespaces to be used in the test.
      * @param string $classname The name of the class to attempt to load.
      * @param string $includedfiles The file expected to be loaded.
+     * @runInSeparateProcess
      */
     public function test_classloader($psr0, $psr4, $classname, $includedfiles) {
         $psr0namespaces = new ReflectionProperty('core_component', 'psr0namespaces');
@@ -649,7 +631,8 @@ class component_test extends advanced_testcase {
         // This is not in the spec, but may come up in some libraries using both namespaces and PEAR-style class names.
         // If problems arise we can remove this test, but will need to add a warning.
         // Normalise to forward slash for testing purposes.
-        $directory = str_replace('\\', '/', $CFG->dirroot) . "/lib/tests/fixtures/component/";
+        $dirroot = str_replace('\\', '/', $CFG->dirroot);
+        $directory = "{$dirroot}/lib/tests/fixtures/component/";
 
         $psr0 = [
           'psr0'      => 'lib/tests/fixtures/component/psr0',
@@ -720,6 +703,28 @@ class component_test extends advanced_testcase {
               'classname' => 'overlap_subnamespace_example2',
               'file' => "{$directory}overlap/subnamespace/example2.php",
           ],
+            'PSR-4 namespaces can come from multiple sources - first source' => [
+                'psr0' => $psr0,
+                'psr4' => [
+                    'Psr\\Http\\Message' => [
+                        'lib/psr/http-message/src',
+                        'lib/psr/http-factory/src',
+                    ],
+                ],
+                'classname' => 'Psr\Http\Message\ServerRequestInterface',
+                'includedfiles' => "{$dirroot}/lib/psr/http-message/src/ServerRequestInterface.php",
+            ],
+            'PSR-4 namespaces can come from multiple sources - second source' => [
+                'psr0' => [],
+                'psr4' => [
+                    'Psr\\Http\\Message' => [
+                        'lib/psr/http-message/src',
+                        'lib/psr/http-factory/src',
+                    ],
+                ],
+                'classname' => 'Psr\Http\Message\ServerRequestFactoryInterface',
+                'includedfiles' => "{$dirroot}/lib/psr/http-factory/src/ServerRequestFactoryInterface.php",
+            ],
         ];
     }
 
@@ -731,6 +736,7 @@ class component_test extends advanced_testcase {
      * @param array $psr4 The PSR-4 namespaces to be used in the test.
      * @param string $classname The name of the class to attempt to load.
      * @param string|bool $file The expected file corresponding to the class or false for nonexistant.
+     * @runInSeparateProcess
      */
     public function test_psr_classloader($psr0, $psr4, $classname, $file) {
         $psr0namespaces = new ReflectionProperty('core_component', 'psr0namespaces');
@@ -782,7 +788,7 @@ class component_test extends advanced_testcase {
               'separators' => ['\\'],
               'result' => $CFG->dirroot . "/test/src/Multiple/Namespaces.php",
           ],
-          'Getting a file with multiple namespaces' => [
+          'Getting a file with multiple namespaces (non-existent)' => [
               'classname' => 'Nonexistant\\Namespace\\Test',
               'prefix' => "Test",
               'path' => 'test/src',

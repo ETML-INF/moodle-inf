@@ -757,6 +757,26 @@ class core_course_external extends external_api {
     }
 
     /**
+     * Return array of all editable course custom fields indexed by their shortname
+     *
+     * @param \context $context
+     * @param int $courseid
+     * @return \core_customfield\field_controller[]
+     */
+    public static function get_editable_customfields(\context $context, int $courseid = 0): array {
+        $result = [];
+
+        $handler = \core_course\customfield\course_handler::create();
+        $handler->set_parent_context($context);
+
+        foreach ($handler->get_editable_fields($courseid) as $field) {
+            $result[$field->get('shortname')] = $field;
+        }
+
+        return $result;
+    }
+
+    /**
      * Returns description of method parameters
      *
      * @return external_function_parameters
@@ -928,8 +948,13 @@ class core_course_external extends external_api {
 
             // Custom fields.
             if (!empty($course['customfields'])) {
+                $customfields = self::get_editable_customfields($context);
                 foreach ($course['customfields'] as $field) {
-                    $course['customfield_'.$field['shortname']] = $field['value'];
+                    if (array_key_exists($field['shortname'], $customfields)) {
+                        // Ensure we're populating the element form fields correctly.
+                        $controller = \core_customfield\data_controller::create(0, null, $customfields[$field['shortname']]);
+                        $course[$controller->get_form_element_name()] = $field['value'];
+                    }
                 }
             }
 
@@ -1141,10 +1166,15 @@ class core_course_external extends external_api {
                     }
                 }
 
-                // Prepare list of custom fields.
+                // Custom fields.
                 if (isset($course['customfields'])) {
+                    $customfields = self::get_editable_customfields($context, $course['id']);
                     foreach ($course['customfields'] as $field) {
-                        $course['customfield_' . $field['shortname']] = $field['value'];
+                        if (array_key_exists($field['shortname'], $customfields)) {
+                            // Ensure we're populating the element form fields correctly.
+                            $controller = \core_customfield\data_controller::create(0, null, $customfields[$field['shortname']]);
+                            $course[$controller->get_form_element_name()] = $field['value'];
+                        }
                     }
                 }
 
@@ -2139,6 +2169,19 @@ class core_course_external extends external_api {
             $categorycontext = context_coursecat::instance($cat['id']);
             self::validate_context($categorycontext);
             require_capability('moodle/category:manage', $categorycontext);
+
+            // If the category parent is being changed, check for capability in the new parent category
+            if (isset($cat['parent']) && ($cat['parent'] !== $category->parent)) {
+                if ($cat['parent'] == 0) {
+                    // Creating a top level category requires capability in the system context
+                    $parentcontext = context_system::instance();
+                } else {
+                    // Category context
+                    $parentcontext = context_coursecat::instance($cat['parent']);
+                }
+                self::validate_context($parentcontext);
+                require_capability('moodle/category:manage', $parentcontext);
+            }
 
             // this will throw an exception if descriptionformat is not valid
             util::validate_format($cat['descriptionformat']);

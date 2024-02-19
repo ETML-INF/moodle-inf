@@ -258,7 +258,7 @@ class profile_field_base {
      * @param MoodleQuickForm $mform instance of the moodleform class
      */
     public function edit_field_set_default($mform) {
-        if (!empty($this->field->defaultdata)) {
+        if (isset($this->field->defaultdata)) {
             $mform->setDefault($this->inputname, $this->field->defaultdata);
         }
     }
@@ -585,6 +585,16 @@ class profile_field_base {
      */
     public function get_field_properties() {
         return array(PARAM_RAW, NULL_NOT_ALLOWED);
+    }
+
+    /**
+     * Whether to display the field and content to the user
+     *
+     * @param context|null $context
+     * @return bool
+     */
+    public function show_field_content(?context $context = null): bool {
+        return $this->is_visible($context) && !$this->is_empty();
     }
 
     /**

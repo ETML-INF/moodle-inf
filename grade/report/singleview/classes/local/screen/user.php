@@ -102,7 +102,7 @@ class user extends tablelike implements selectable_items {
     public function init($selfitemisempty = false) {
 
         if (!$selfitemisempty) {
-            $validusers = $this->load_users();
+            $validusers = \grade_report::get_gradable_users($this->courseid, $this->groupid);
             if (!isset($validusers[$this->itemid])) {
                 // If the passed user id is not valid, show the first user from the list instead.
                 $this->item = reset($validusers);
@@ -264,6 +264,7 @@ class user extends tablelike implements selectable_items {
         $extraclasses = 'btn btn-link btn-icon icon-size-3 d-flex align-items-center justify-content-center';
         $menu->set_menu_trigger($icon, $extraclasses);
         $menu->set_menu_left();
+        $menu->set_boundary('window');
 
         return $OUTPUT->render($menu);
     }
@@ -304,7 +305,9 @@ class user extends tablelike implements selectable_items {
      * @return string
      */
     public function heading(): string {
-        return get_string('gradeuser', 'gradereport_singleview', fullname($this->item));
+        global $PAGE;
+        $headinglangstring = $PAGE->user_is_editing() ? 'gradeuseredit' : 'gradeuser';
+        return get_string($headinglangstring, 'gradereport_singleview', fullname($this->item));
     }
 
     /**

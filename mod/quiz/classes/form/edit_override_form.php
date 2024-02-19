@@ -70,6 +70,12 @@ class edit_override_form extends moodleform {
             cm_info|stdClass $cm, stdClass $quiz, context_module $context,
             bool $groupmode, ?stdClass $override) {
 
+        // Normalise our course module instance.
+        if (!($cm instanceof cm_info)) {
+            $course = get_course($quiz->course);
+            $cm = get_fast_modinfo($course)->get_cm($cm->id);
+        }
+
         $this->cm = $cm;
         $this->quiz = $quiz;
         $this->context = $context;
@@ -96,7 +102,7 @@ class edit_override_form extends moodleform {
             if ($this->groupid) {
                 // There is already a groupid, so freeze the selector.
                 $groupchoices = [
-                    $this->groupid => format_string(groups_get_group_name($this->groupid), true, $this->context),
+                    $this->groupid => format_string(groups_get_group_name($this->groupid), true, ['context' => $this->context]),
                 ];
                 $mform->addElement('select', 'groupid',
                         get_string('overridegroup', 'quiz'), $groupchoices);
@@ -114,7 +120,7 @@ class edit_override_form extends moodleform {
                 $groupchoices = [];
                 foreach ($groups as $group) {
                     if ($group->visibility != GROUPS_VISIBILITY_NONE) {
-                        $groupchoices[$group->id] = format_string($group->name, true, $this->context);
+                        $groupchoices[$group->id] = format_string($group->name, true, ['context' => $this->context]);
                     }
                 }
                 unset($groups);
@@ -154,7 +160,7 @@ class edit_override_form extends moodleform {
                         $this->context, $userfieldsql->mappings);
 
                 $users = $DB->get_records_sql("
-                        SELECT $userfieldsql->selects
+                        SELECT DISTINCT $userfieldsql->selects
                           FROM {user} u
                           $enrolledjoin->joins
                           $userfieldsql->joins

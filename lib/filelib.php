@@ -186,7 +186,9 @@ function file_prepare_standard_editor($data, $field, array $options, $context=nu
             $data->{$field.'format'} = editors_get_preferred_format();
         }
         if (!$options['noclean']) {
-            $data->{$field} = clean_text($data->{$field}, $data->{$field.'format'});
+            if ($data->{$field.'format'} != FORMAT_MARKDOWN) {
+                $data->{$field} = clean_text($data->{$field}, $data->{$field . 'format'});
+            }
         }
 
     } else {
@@ -198,7 +200,11 @@ function file_prepare_standard_editor($data, $field, array $options, $context=nu
             $data = trusttext_pre_edit($data, $field, $context);
         } else {
             if (!$options['noclean']) {
-                $data->{$field} = clean_text($data->{$field}, $data->{$field.'format'});
+                // We do not have a way to sanitise Markdown texts,
+                // luckily editors for this format should not have XSS problems.
+                if ($data->{$field.'format'} != FORMAT_MARKDOWN) {
+                    $data->{$field} = clean_text($data->{$field}, $data->{$field.'format'});
+                }
             }
         }
         $contextid = $context->id;
@@ -2062,9 +2068,12 @@ function get_mimetype_description($obj, $capitalise=false) {
  */
 function file_get_typegroup($element, $groups) {
     static $cached = array();
+
+    // Turn groups into a list.
     if (!is_array($groups)) {
-        $groups = array($groups);
+        $groups = preg_split('/[\s,;:"\']+/', $groups, -1, PREG_SPLIT_NO_EMPTY);
     }
+
     if (!array_key_exists($element, $cached)) {
         $cached[$element] = array();
     }
@@ -3124,7 +3133,7 @@ class curl {
     public $rawresponse = array();
     /** @var array http header */
     public  $header   = array();
-    /** @var string cURL information */
+    /** @var array cURL information */
     public  $info;
     /** @var string error */
     public  $error;
@@ -3154,6 +3163,8 @@ class curl {
     private $ignoresecurity;
     /** @var array $mockresponses For unit testing only - return the head of this list instead of making the next request. */
     private static $mockresponses = [];
+    /** @var array temporary params value if the value is not belongs to class stored_file. */
+    public $_tmp_file_post_params = [];
 
     /**
      * Curl constructor.
@@ -4168,7 +4179,7 @@ class curl {
     /**
      * Get curl information
      *
-     * @return string
+     * @return array
      */
     public function get_info() {
         return $this->info;
@@ -4241,6 +4252,9 @@ class curl {
 class curl_cache {
     /** @var string Path to cache directory */
     public $dir = '';
+
+    /** @var int the repositorycacheexpire config value. */
+    private $ttl;
 
     /**
      * Constructor
