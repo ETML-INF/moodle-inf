@@ -185,7 +185,7 @@ class boostnavbar_test extends \advanced_testcase {
      * @param array $expected
      * @throws \ReflectionException
      */
-    public function test_remove_no_link_items(array $setup, bool $removesectionnodes, array $expected) {
+    public function test_remove_no_link_items(array $setup, bool $removesectionnodes, array $expected): void {
         global $PAGE;
 
         $this->resetAfterTest();
@@ -209,12 +209,10 @@ class boostnavbar_test extends \advanced_testcase {
 
         $rc = new \ReflectionClass(boostnavbar::class);
         $rcp = $rc->getProperty('items');
-        $rcp->setAccessible(true);
         $rcp->setValue($boostnavbar, $page->navbar->get_items());
 
         // Make the call to the function.
         $rcm = $rc->getMethod('remove_no_link_items');
-        $rcm->setAccessible(true);
         $rcm->invoke($boostnavbar, $removesectionnodes);
 
         // Get the value for the class variable that the function modifies.
@@ -371,7 +369,7 @@ class boostnavbar_test extends \advanced_testcase {
      * @param array $navbarnodes The array containing the text and action of the nodes to be added to the navbar
      * @param array $expected The array containing the text of the expected navbar nodes
      */
-    public function test_remove_duplicate_items(array $navbarnodes, array $expected) {
+    public function test_remove_duplicate_items(array $navbarnodes, array $expected): void {
         $this->resetAfterTest();
         $page = new \moodle_page();
         $page->set_url('/');
@@ -388,12 +386,10 @@ class boostnavbar_test extends \advanced_testcase {
 
         $rc = new \ReflectionClass(boostnavbar::class);
         $rcp = $rc->getProperty('items');
-        $rcp->setAccessible(true);
         $rcp->setValue($boostnavbar, $page->navbar->get_items());
 
         // Make the call to the function.
         $rcm = $rc->getMethod('remove_duplicate_items');
-        $rcm->setAccessible(true);
         $rcm->invoke($boostnavbar);
 
         // Get the value for the class variable that the function modifies.
@@ -492,7 +488,7 @@ class boostnavbar_test extends \advanced_testcase {
      * @param array $expected Array containing the text of the expected navbar nodes after the filtering
      */
     public function test_remove_items_that_exist_in_navigation(string $navmenu, array $navmenunodes, array $navbarnodes,
-            array $expected) {
+            array $expected): void {
         global $PAGE;
 
         // Unfortunate hack needed because people use global $PAGE around the place.
@@ -527,12 +523,10 @@ class boostnavbar_test extends \advanced_testcase {
 
         $rc = new \ReflectionClass(boostnavbar::class);
         $rcp = $rc->getProperty('items');
-        $rcp->setAccessible(true);
         $rcp->setValue($boostnavbar, $page->navbar->get_items());
 
         // Make the call to the function.
         $rcm = $rc->getMethod('remove_items_that_exist_in_navigation');
-        $rcm->setAccessible(true);
         $rcm->invoke($boostnavbar, $navigationmenu);
 
         // Get the value for the class variable that the function modifies.

@@ -107,31 +107,31 @@ class get_gradable_users_test extends \externallib_advanced_testcase {
                 false,
                 [
                     [
-                        'profileimageurl' => 'https://www.example.com/moodle/theme/image.php/_s/boost/core/1/u/f1',
+                        'profileimageurl' => 'https://www.example.com/moodle/theme/image.php/boost/core/1/u/f1',
                         'firstname' => 'Apple',
                         'lastname' => 'Apricot',
                         'fullname' => 'Apple Apricot',
                     ],
                     [
-                        'profileimageurl' => 'https://www.example.com/moodle/theme/image.php/_s/boost/core/1/u/f1',
+                        'profileimageurl' => 'https://www.example.com/moodle/theme/image.php/boost/core/1/u/f1',
                         'firstname' => 'Banana',
                         'lastname' => 'Blueberry',
                         'fullname' => 'Banana Blueberry',
                     ],
                     [
-                        'profileimageurl' => 'https://www.example.com/moodle/theme/image.php/_s/boost/core/1/u/f1',
+                        'profileimageurl' => 'https://www.example.com/moodle/theme/image.php/boost/core/1/u/f1',
                         'firstname' => 'Cherry',
                         'lastname' => 'Cranberry',
                         'fullname' => 'Cherry Cranberry',
                     ],
                     [
-                        'profileimageurl' => 'https://www.example.com/moodle/theme/image.php/_s/boost/core/1/u/f1',
+                        'profileimageurl' => 'https://www.example.com/moodle/theme/image.php/boost/core/1/u/f1',
                         'firstname' => 'Durian',
                         'lastname' => 'Dracontomelon',
                         'fullname' => 'Durian Dracontomelon',
                     ],
                     [
-                        'profileimageurl' => 'https://www.example.com/moodle/theme/image.php/_s/boost/core/1/u/f1',
+                        'profileimageurl' => 'https://www.example.com/moodle/theme/image.php/boost/core/1/u/f1',
                         'firstname' => 'Eggplant',
                         'lastname' => 'Ensete',
                         'fullname' => 'Eggplant Ensete',
@@ -143,25 +143,25 @@ class get_gradable_users_test extends \externallib_advanced_testcase {
                 false,
                 [
                     [
-                        'profileimageurl' => 'https://www.example.com/moodle/theme/image.php/_s/boost/core/1/u/f1',
+                        'profileimageurl' => 'https://www.example.com/moodle/theme/image.php/boost/core/1/u/f1',
                         'firstname' => 'Apple',
                         'lastname' => 'Apricot',
                         'fullname' => 'Apple Apricot',
                     ],
                     [
-                        'profileimageurl' => 'https://www.example.com/moodle/theme/image.php/_s/boost/core/1/u/f1',
+                        'profileimageurl' => 'https://www.example.com/moodle/theme/image.php/boost/core/1/u/f1',
                         'firstname' => 'Banana',
                         'lastname' => 'Blueberry',
                         'fullname' => 'Banana Blueberry',
                     ],
                     [
-                        'profileimageurl' => 'https://www.example.com/moodle/theme/image.php/_s/boost/core/1/u/f1',
+                        'profileimageurl' => 'https://www.example.com/moodle/theme/image.php/boost/core/1/u/f1',
                         'firstname' => 'Cherry',
                         'lastname' => 'Cranberry',
                         'fullname' => 'Cherry Cranberry',
                     ],
                     [
-                        'profileimageurl' => 'https://www.example.com/moodle/theme/image.php/_s/boost/core/1/u/f1',
+                        'profileimageurl' => 'https://www.example.com/moodle/theme/image.php/boost/core/1/u/f1',
                         'firstname' => 'Durian',
                         'lastname' => 'Dracontomelon',
                         'fullname' => 'Durian Dracontomelon',
@@ -173,19 +173,19 @@ class get_gradable_users_test extends \externallib_advanced_testcase {
                 true,
                 [
                     [
-                        'profileimageurl' => 'https://www.example.com/moodle/theme/image.php/_s/boost/core/1/u/f1',
+                        'profileimageurl' => 'https://www.example.com/moodle/theme/image.php/boost/core/1/u/f1',
                         'firstname' => 'Apple',
                         'lastname' => 'Apricot',
                         'fullname' => 'Apple Apricot',
                     ],
                     [
-                        'profileimageurl' => 'https://www.example.com/moodle/theme/image.php/_s/boost/core/1/u/f1',
+                        'profileimageurl' => 'https://www.example.com/moodle/theme/image.php/boost/core/1/u/f1',
                         'firstname' => 'Banana',
                         'lastname' => 'Blueberry',
                         'fullname' => 'Banana Blueberry',
                     ],
                     [
-                        'profileimageurl' => 'https://www.example.com/moodle/theme/image.php/_s/boost/core/1/u/f1',
+                        'profileimageurl' => 'https://www.example.com/moodle/theme/image.php/boost/core/1/u/f1',
                         'firstname' => 'Cherry',
                         'lastname' => 'Cranberry',
                         'fullname' => 'Cherry Cranberry',

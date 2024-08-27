@@ -230,7 +230,6 @@ class report_test extends \advanced_testcase {
             $reflectionobject = $parent;
         }
         $prefsproperty = $reflectionobject->getProperty('prefs');
-        $prefsproperty->setAccessible(true);
         $prefs = $prefsproperty->getValue($table);
         $prefs['i_first'] = 'A';
         $prefsproperty->setValue($table, $prefs);
@@ -328,7 +327,7 @@ class report_test extends \advanced_testcase {
      *
      * @covers ::regrade_question
      */
-    public function test_regrade_question() {
+    public function test_regrade_question(): void {
         global $DB;
         $this->resetAfterTest();
         $this->setAdminUser();
@@ -398,7 +397,6 @@ class report_test extends \advanced_testcase {
 
         // Now change the quiz back to always latest and regrade again.
         submit_question_version::execute($slot->slotid, 0);
-        $report->clear_regrade_date_cache();
         $report->regrade_attempt($attempt);
 
         // Score should now be 5, because v3 is the latest non-draft version.

@@ -20,12 +20,12 @@ Feature: We can change the maximum and minimum number of points for manual items
       | student1 | C1 | student |
       | student2 | C1 | student |
     And I am on the "Course 1" "grades > gradebook setup" page logged in as "teacher1"
-    And I press "Add grade item"
+    And I choose the "Add grade item" item in the "Add" action menu
     And I set the following fields to these values:
       | Item name | Manual item 1 |
       | Minimum grade | 0 |
       | Maximum grade | 100 |
-    And I press "Save changes"
+    And I click on "Save" "button" in the "New grade item" "dialogue"
     And I navigate to "Setup > Course grade settings" in the course gradebook
     And I set the field "Show weightings" to "Show"
     And I set the field "Show contribution to course total" to "Show"
@@ -56,7 +56,7 @@ Feature: We can change the maximum and minimum number of points for manual items
     And I set the following fields to these values:
       | Rescale existing grades | Yes |
       | Maximum grade | 20 |
-    And I press "Save changes"
+    And I click on "Save" "button" in the "Edit grade item" "dialogue"
     And I navigate to "View > User report" in the course gradebook
     And I click on "Student 1" in the "user" search widget
     And the following should exist in the "user-grade" table:

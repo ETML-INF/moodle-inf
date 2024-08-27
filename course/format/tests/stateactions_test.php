@@ -897,7 +897,7 @@ class stateactions_test extends \advanced_testcase {
         bool $validcms = true,
         string $role = 'admin',
         bool $expectedexception = false
-    ) {
+    ): void {
         $this->resetAfterTest();
 
         // Create a course with 3 sections.
@@ -1134,6 +1134,87 @@ class stateactions_test extends \advanced_testcase {
             null,
             'indent',
             0
+        );
+    }
+
+    /**
+     * Test for cm_nogroups
+     *
+     * @covers ::cm_nogroups
+     * @dataProvider basic_role_provider
+     * @param string $role the user role
+     * @param bool $expectedexception if it will expect an exception.
+     */
+    public function test_cm_nogroups(
+        string $role = 'editingteacher',
+        bool $expectedexception = false
+    ): void {
+        $this->basic_state_text(
+            'cm_nogroups',
+            $role,
+            ['cm0', 'cm1', 'cm2', 'cm3'],
+            $expectedexception,
+            ['put' => 4],
+            null,
+            null,
+            null,
+            null,
+            'groupmode',
+            NOGROUPS
+        );
+    }
+
+    /**
+     * Test for cm_visiblegroups
+     *
+     * @covers ::cm_visiblegroups
+     * @dataProvider basic_role_provider
+     * @param string $role the user role
+     * @param bool $expectedexception if it will expect an exception.
+     */
+    public function test_cm_visiblegroups(
+        string $role = 'editingteacher',
+        bool $expectedexception = false
+    ): void {
+        $this->basic_state_text(
+            'cm_visiblegroups',
+            $role,
+            ['cm0', 'cm1', 'cm2', 'cm3'],
+            $expectedexception,
+            ['put' => 4],
+            null,
+            null,
+            null,
+            null,
+            'groupmode',
+            VISIBLEGROUPS
+        );
+    }
+
+    /**
+     * Test for cm_separategroups
+     *
+     * @covers ::cm_separategroups
+     * @dataProvider basic_role_provider
+     * @param string $role the user role
+     * @param bool $expectedexception if it will expect an exception.
+     */
+    public function test_cm_separategroups(
+        string $role = 'editingteacher',
+        bool $expectedexception = false
+    ): void {
+        $this->basic_state_text(
+            'cm_separategroups',
+            $role,
+            ['cm0', 'cm1', 'cm2', 'cm3'],
+            $expectedexception,
+            ['put' => 4],
+            null,
+            null,
+            null,
+            null,
+            'groupmode',
+            SEPARATEGROUPS
         );
     }
 

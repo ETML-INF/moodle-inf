@@ -619,27 +619,6 @@ function assign_page_type_list($pagetype, $parentcontext, $currentcontext) {
 }
 
 /**
- * @deprecated since Moodle 3.3, when the block_course_overview block was removed.
- */
-function assign_print_overview() {
-    throw new coding_exception('assign_print_overview() can not be used any more and is obsolete.');
-}
-
-/**
- * @deprecated since Moodle 3.3, when the block_course_overview block was removed.
- */
-function assign_get_mysubmission_details_for_print_overview() {
-    throw new coding_exception('assign_get_mysubmission_details_for_print_overview() can not be used any more and is obsolete.');
-}
-
-/**
- * @deprecated since Moodle 3.3, when the block_course_overview block was removed.
- */
-function assign_get_grade_details_for_print_overview() {
-    throw new coding_exception('assign_get_grade_details_for_print_overview() can not be used any more and is obsolete.');
-}
-
-/**
  * Print recent activity from all assignments in a given course
  *
  * This is used by the recent activity block
@@ -959,14 +938,6 @@ function assign_print_recent_mod_activity($activity, $courseid, $detail, $modnam
     echo '</div>';
 
     echo '</td></tr></table>';
-}
-
-/**
- * @deprecated since Moodle 3.8
- */
-function assign_scale_used() {
-    throw new coding_exception('assign_scale_used() can not be used anymore. Plugins can implement ' .
-        '<modname>_scale_used_anywhere, all implementations of <modname>_scale_used are now ignored');
 }
 
 /**
@@ -1429,6 +1400,8 @@ function assign_pluginfile($course,
 function mod_assign_output_fragment_gradingpanel($args) {
     global $CFG;
 
+    \core\session\manager::write_close(); // No changes to session in this function.
+
     $context = $args['context'];
 
     if ($context->contextlevel != CONTEXT_MODULE) {
@@ -1816,7 +1789,7 @@ function mod_assign_user_preferences(): array {
  * @param  array  $args The path (the part after the filearea and before the filename).
  * @return array The itemid and the filepath inside the $args path, for the defined filearea.
  */
-function mod_assign_get_path_from_pluginfile(string $filearea, array $args) : array {
+function mod_assign_get_path_from_pluginfile(string $filearea, array $args): array {
     // Assign never has an itemid (the number represents the revision but it's not stored in database).
     array_shift($args);
 

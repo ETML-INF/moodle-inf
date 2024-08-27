@@ -44,7 +44,7 @@ class provider implements
      * @param collection $collection The initialised collection to add items to.
      * @return collection A listing of user data stored through this system.
      */
-    public static function get_metadata(collection $collection) : collection {
+    public static function get_metadata(collection $collection): collection {
 
         $collection->add_database_table('external_tokens', [
             'token' => 'privacy:metadata:tokens:token',
@@ -56,6 +56,7 @@ class provider implements
             'validuntil' => 'privacy:metadata:tokens:validuntil',
             'timecreated' => 'privacy:metadata:tokens:timecreated',
             'lastaccess' => 'privacy:metadata:tokens:lastaccess',
+            'name' => 'privacy:metadata:tokens:name',
         ], 'privacy:metadata:tokens');
 
         $collection->add_database_table('external_services_users', [
@@ -293,6 +294,7 @@ class provider implements
             'valid_until' => $record->validuntil ? transform::datetime($record->validuntil) : null,
             'created_on' => transform::datetime($record->timecreated),
             'last_access' => $record->lastaccess ? transform::datetime($record->lastaccess) : null,
+            'name' => $record->name,
         ];
     }
 

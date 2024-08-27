@@ -40,6 +40,7 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
+use mod_quiz\output\edit_nav_actions;
 use mod_quiz\quiz_settings;
 
 require_once(__DIR__ . '/../../config.php');
@@ -49,7 +50,7 @@ require_once($CFG->dirroot . '/question/editlib.php');
 $mdlscrollto = optional_param('mdlscrollto', '', PARAM_INT);
 
 list($thispageurl, $contexts, $cmid, $cm, $quiz, $pagevars) =
-        question_edit_setup('editq', '/mod/quiz/edit.php', true);
+    question_edit_setup('editq', '/mod/quiz/edit.php', true);
 
 $PAGE->set_url($thispageurl);
 $PAGE->set_secondary_active_tab("mod_quiz_edit");
@@ -166,10 +167,6 @@ $event = \mod_quiz\event\edit_page_viewed::create([
 ]);
 $event->trigger();
 
-// Get the question bank view.
-$questionbank = new mod_quiz\question\bank\custom_view($contexts, $thispageurl, $course, $cm, $quiz);
-$questionbank->set_quiz_has_attempts($quizhasattempts);
-
 // End of process commands =====================================================.
 
 $PAGE->set_pagelayout('incourse');
@@ -184,7 +181,17 @@ $node = $PAGE->settingsnav->find('mod_quiz_edit', navigation_node::TYPE_SETTING)
 if ($node) {
     $node->make_active();
 }
-echo $OUTPUT->header();
+
+// Add random question - result message.
+if ($message = optional_param('message', '', PARAM_TEXT)) {
+    core\notification::add($message, core\notification::SUCCESS);
+}
+
+$tertiarynav = new edit_nav_actions($cmid, edit_nav_actions::SUMMARY);
+
+// Do output.
+echo $output->header();
+echo $output->render($tertiarynav);
 
 // Initialise the JavaScript.
 $quizeditconfig = new stdClass();
@@ -210,4 +217,4 @@ echo $output->edit_page($quizobj, $structure, $contexts, $thispageurl, $pagevars
 // Questions wrapper end.
 echo html_writer::end_tag('div');
 
-echo $OUTPUT->footer();
+echo $output->footer();

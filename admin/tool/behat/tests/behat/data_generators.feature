@@ -58,7 +58,7 @@ Feature: Set up contextual data for tests
     And I am on the "Course 1" "groups" page
     Then I should see "Group 1"
     And I should see "Group 2"
-    And I select "Groupings" from the "jump" singleselect
+    And I set the field "Participants tertiary navigation" to "Groupings"
     And I should see "Grouping 1"
     And I should see "Grouping 2"
 
@@ -101,7 +101,7 @@ Feature: Set up contextual data for tests
       | user | course | role |
       | student1 | C1 | student |
     When I am on the "Course 1" course page logged in as student1
-    Then I should see "Topic 1"
+    Then I should see "New section"
 
   Scenario: Add role assigns
     Given the following "roles" exist:
@@ -150,6 +150,8 @@ Feature: Set up contextual data for tests
     Given the following "courses" exist:
       | fullname | shortname |
       | Course 1 | C1 |
+    And I enable "chat" "mod" plugin
+    And I enable "survey" "mod" plugin
     And the following "activities" exist:
       | activity   | name                   | intro                         | course | idnumber    |
       | assign     | Test assignment name   | Test assignment description   | C1     | assign1     |
@@ -322,21 +324,21 @@ Feature: Set up contextual data for tests
     And I choose "Edit grade item" in the open action menu
     And I expand all fieldsets
     And I should see "Course 1"
-    And I press "Cancel"
+    And I click on "Cancel" "button" in the "Edit grade item" "dialogue"
     And I should see "Grade category 1"
     And I should see "Test Grade Item 2"
     And I click on grade item menu "Test Grade Item 2" of type "gradeitem" on "setup" page
     And I choose "Edit grade item" in the open action menu
     And I expand all fieldsets
     And I should see "Grade category 1"
-    And I press "Cancel"
+    And I click on "Cancel" "button" in the "Edit grade item" "dialogue"
     And I should see "Grade sub category 2"
     And I should see "Test Grade Item 3"
     And I click on grade item menu "Test Grade Item 3" of type "gradeitem" on "setup" page
     And I choose "Edit grade item" in the open action menu
     And I expand all fieldsets
     And I should see "Grade sub category 2"
-    And I press "Cancel"
+    And I click on "Cancel" "button" in the "Edit grade item" "dialogue"
 
   Scenario: Add a bunch of scales
     Given the following "courses" exist:
@@ -394,8 +396,8 @@ Feature: Set up contextual data for tests
     Then I should see "Test Outcome Grade Item 1"
     And I click on grade item menu "Test Outcome Grade Item 1" of type "gradeitem" on "setup" page
     And I choose "Edit grade item" in the open action menu
+    And I click on "Show more..." "link" in the "Edit outcome item" "dialogue"
     And the field "Outcome" matches value "Grade outcome 1"
-    And I expand all fieldsets
     And I should see "Grade category 1" in the "Grade category" "form_row"
     And I press "Cancel"
 

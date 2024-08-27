@@ -26,7 +26,8 @@ Feature: View activity completion information in the h5p activity
       | packagefilepath    | h5p/tests/fixtures/filltheblanks.h5p |
 
   Scenario: View automatic completion items
-    Given I am on the "Music history" "h5pactivity activity" page logged in as teacher1
+    Given I change window size to "large"
+    And I am on the "Music history" "h5pactivity activity" page logged in as teacher1
     # Teacher view.
     And "Music history" should have the "View" completion condition
     And "Music history" should have the "Receive a grade" completion condition
@@ -42,7 +43,7 @@ Feature: View activity completion information in the h5p activity
   Scenario: Use manual completion
     Given I am on the "Music history" "h5pactivity activity editing" page logged in as teacher1
     And I expand all fieldsets
-    And I set the field "Completion tracking" to "Students can manually mark the activity as completed"
+    And I set the field "Students must manually mark the activity as done" to "1"
     And I press "Save and display"
     # Teacher view.
     And I am on the "Music history" "h5pactivity activity" page

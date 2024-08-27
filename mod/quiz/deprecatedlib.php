@@ -27,191 +27,18 @@ use mod_quiz\quiz_settings;
 use mod_quiz\task\update_overdue_attempts;
 
 /**
- * Internal function used in quiz_get_completion_state. Check passing grade (or no attempts left) requirement for completion.
- *
  * @deprecated since Moodle 3.11
- * @todo MDL-71196 Final deprecation in Moodle 4.3
- * @see \mod_quiz\completion\custom_completion
- * @param stdClass $course
- * @param cm_info|stdClass $cm
- * @param int $userid
- * @param stdClass $quiz
- * @return bool True if the passing grade (or no attempts left) requirement is disabled or met.
- * @throws coding_exception
  */
-function quiz_completion_check_passing_grade_or_all_attempts($course, $cm, $userid, $quiz) {
-    global $CFG;
-
-    debugging('quiz_completion_check_passing_grade_or_all_attempts has been deprecated.', DEBUG_DEVELOPER);
-
-    if (!$cm->completionpassgrade) {
-        return true;
-    }
-
-    // Check for passing grade.
-    require_once($CFG->libdir . '/gradelib.php');
-    $item = grade_item::fetch(['courseid' => $course->id, 'itemtype' => 'mod',
-            'itemmodule' => 'quiz', 'iteminstance' => $cm->instance, 'outcomeid' => null]);
-    if ($item) {
-        $grades = grade_grade::fetch_users_grades($item, [$userid], false);
-        if (!empty($grades[$userid]) && $grades[$userid]->is_passed($item)) {
-            return true;
-        }
-    }
-
-    // If a passing grade is required and exhausting all available attempts is not accepted for completion,
-    // then this quiz is not complete.
-    if (!$quiz->completionattemptsexhausted) {
-        return false;
-    }
-
-    // Check if all attempts are used up.
-    $attempts = quiz_get_user_attempts($quiz->id, $userid, 'finished', true);
-    if (!$attempts) {
-        return false;
-    }
-    $lastfinishedattempt = end($attempts);
-    $context = context_module::instance($cm->id);
-    $quizobj = quiz_settings::create($quiz->id, $userid);
-    $accessmanager = new access_manager($quizobj, time(),
-            has_capability('mod/quiz:ignoretimelimits', $context, $userid, false));
-
-    return $accessmanager->is_finished(count($attempts), $lastfinishedattempt);
+function quiz_get_completion_state() {
+    $completionclass = \mod_quiz\completion\custom_completion::class;
+    throw new coding_exception(__FUNCTION__ . "() has been removed, please use the '{$completionclass}' class instead");
 }
 
 /**
- * Internal function used in quiz_get_completion_state. Check minimum attempts requirement for completion.
- *
- * @deprecated since Moodle 3.11
- * @todo MDL-71196 Final deprecation in Moodle 4.3
- * @see \mod_quiz\completion\custom_completion
- * @param int $userid
- * @param stdClass $quiz
- * @return bool True if minimum attempts requirement is disabled or met.
- */
-function quiz_completion_check_min_attempts($userid, $quiz) {
-
-    debugging('quiz_completion_check_min_attempts has been deprecated.', DEBUG_DEVELOPER);
-
-    if (empty($quiz->completionminattempts)) {
-        return true;
-    }
-
-    // Check if the user has done enough attempts.
-    $attempts = quiz_get_user_attempts($quiz->id, $userid, 'finished', true);
-    return $quiz->completionminattempts <= count($attempts);
-}
-
-/**
- * Obtains the automatic completion state for this quiz on any conditions
- * in quiz settings, such as if all attempts are used or a certain grade is achieved.
- *
- * @deprecated since Moodle 3.11
- * @todo MDL-71196 Final deprecation in Moodle 4.3
- * @see \mod_quiz\completion\custom_completion
- * @param stdClass $course Course
- * @param cm_info|stdClass $cm Course-module
- * @param int $userid User ID
- * @param bool $type Type of comparison (or/and; can be used as return value if no conditions)
- * @return bool True if completed, false if not. (If no conditions, then return
- *   value depends on comparison type)
- */
-function quiz_get_completion_state($course, $cm, $userid, $type) {
-    global $DB;
-
-    // No need to call debugging here. Deprecation debugging notice already being called in \completion_info::internal_get_state().
-
-    $quiz = $DB->get_record('quiz', ['id' => $cm->instance], '*', MUST_EXIST);
-    if (!$quiz->completionattemptsexhausted && !$cm->completionpassgrade && !$quiz->completionminattempts) {
-        return $type;
-    }
-
-    if (!quiz_completion_check_passing_grade_or_all_attempts($course, $cm, $userid, $quiz)) {
-        return false;
-    }
-
-    if (!quiz_completion_check_min_attempts($userid, $quiz)) {
-        return false;
-    }
-
-    return true;
-}
-
-/**
- * Retrieves tag information for the given list of quiz slot ids.
- * Currently the only slots that have tags are random question slots.
- *
- * Example:
- * If we have 3 slots with id 1, 2, and 3. The first slot has two tags, the second
- * has one tag, and the third has zero tags. The return structure will look like:
- * [
- *      1 => [
- *          quiz_slot_tags.id => { ...tag data... },
- *          quiz_slot_tags.id => { ...tag data... },
- *      ],
- *      2 => [
- *          quiz_slot_tags.id => { ...tag data... },
- *      ],
- *      3 => [],
- * ]
- *
- * @param int[] $slotids The list of id for the quiz slots.
- * @return array[] List of quiz_slot_tags records indexed by slot id.
  * @deprecated since Moodle 4.0
- * @todo Final deprecation on Moodle 4.4 MDL-72438
  */
-function quiz_retrieve_tags_for_slot_ids($slotids) {
-    debugging('Method quiz_retrieve_tags_for_slot_ids() is deprecated, ' .
-        'see filtercondition->tags from the question_set_reference table.', DEBUG_DEVELOPER);
-    global $DB;
-    if (empty($slotids)) {
-        return [];
-    }
-
-    $slottags = $DB->get_records_list('quiz_slot_tags', 'slotid', $slotids);
-    $tagsbyid = core_tag_tag::get_bulk(array_filter(array_column($slottags, 'tagid')), 'id, name');
-    $tagsbyname = false; // It will be loaded later if required.
-    $emptytagids = array_reduce($slotids, function($carry, $slotid) {
-        $carry[$slotid] = [];
-        return $carry;
-    }, []);
-
-    return array_reduce(
-        $slottags,
-        function($carry, $slottag) use ($slottags, $tagsbyid, $tagsbyname) {
-            if (isset($tagsbyid[$slottag->tagid])) {
-                // Make sure that we're returning the most updated tag name.
-                $slottag->tagname = $tagsbyid[$slottag->tagid]->name;
-            } else {
-                if ($tagsbyname === false) {
-                    // We were hoping that this query could be avoided, but life
-                    // showed its other side to us!
-                    $tagcollid = core_tag_area::get_collection('core', 'question');
-                    $tagsbyname = core_tag_tag::get_by_name_bulk(
-                        $tagcollid,
-                        array_column($slottags, 'tagname'),
-                        'id, name'
-                    );
-                }
-                if (isset($tagsbyname[$slottag->tagname])) {
-                    // Make sure that we're returning the current tag id that matches
-                    // the given tag name.
-                    $slottag->tagid = $tagsbyname[$slottag->tagname]->id;
-                } else {
-                    // The tag does not exist anymore (neither the tag id nor the tag name
-                    // matches an existing tag).
-                    // We still need to include this row in the result as some callers might
-                    // be interested in these rows. An example is the editing forms that still
-                    // need to display tag names even if they don't exist anymore.
-                    $slottag->tagid = null;
-                }
-            }
-
-            $carry[$slottag->slotid][$slottag->id] = $slottag;
-            return $carry;
-        },
-        $emptytagids
-    );
+function quiz_retrieve_tags_for_slot_ids() {
+    throw new coding_exception(__FUNCTION__ . '() has been removed.');
 }
 
 /**
@@ -483,4 +310,41 @@ function quiz_calculate_best_attempt($quiz, $attempts) {
             }
             return $maxattempt;
     }
+}
+
+/**
+ * Deletes a quiz override from the database and clears any corresponding calendar events
+ *
+ * @deprecated since Moodle 4.4
+ * @todo MDL-80944 Final deprecation in Moodle 4.8
+ * @param stdClass $quiz The quiz object.
+ * @param int $overrideid The id of the override being deleted
+ * @param bool $log Whether to trigger logs.
+ * @return bool true on success
+ */
+#[\core\attribute\deprecated('override_manager::delete_override_by_id', since: '4.4')]
+function quiz_delete_override($quiz, $overrideid, $log = true) {
+    \core\deprecation::emit_deprecation_if_present(__FUNCTION__);
+    $quizsettings = quiz_settings::create($quiz->id);
+    $quizsettings->get_override_manager()->delete_overrides_by_id(
+        ids: [$overrideid],
+        shouldlog: $log,
+    );
+
+    return true;
+}
+
+/**
+ * Deletes all quiz overrides from the database and clears any corresponding calendar events
+ *
+ * @deprecated since Moodle 4.4
+ * @todo MDL-80944 Final deprecation in Moodle 4.8
+ * @param stdClass $quiz The quiz object.
+ * @param bool $log Whether to trigger logs.
+ */
+#[\core\attribute\deprecated('override_manager::delete_all_overrides', since: '4.4')]
+function quiz_delete_all_overrides($quiz, $log = true) {
+    \core\deprecation::emit_deprecation_if_present(__FUNCTION__);
+    $quizsettings = quiz_settings::create($quiz->id);
+    $quizsettings->get_override_manager()->delete_all_overrides(shouldlog: $log);
 }

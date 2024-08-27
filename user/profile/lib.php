@@ -147,6 +147,17 @@ class profile_field_base {
     }
 
     /**
+     * Display the name of the profile field.
+     *
+     * @return string
+     */
+    public function display_name(): string {
+        return format_text($this->field->name, FORMAT_MOODLE, [
+            'para' => false,
+        ]);
+    }
+
+    /**
      * Print out the form field in the edit profile page
      * @param MoodleQuickForm $mform instance of the moodleform class
      * @return bool
@@ -751,29 +762,6 @@ function profile_save_data(stdClass $usernew): void {
     $fields = profile_get_user_fields_with_data($usernew->id);
     foreach ($fields as $formfield) {
         $formfield->edit_save_data($usernew);
-    }
-}
-
-/**
- * Display profile fields.
- *
- * @deprecated since Moodle 3.11 MDL-71051 - please do not use this function any more.
- * @todo MDL-71413 This will be deleted in Moodle 4.3.
- *
- * @param int $userid
- */
-function profile_display_fields($userid) {
-    debugging('Function profile_display_fields() is deprecated because it is no longer used and will be '.
-        'removed in future versions of Moodle', DEBUG_DEVELOPER);
-
-    $categories = profile_get_user_fields_with_data_by_category($userid);
-    foreach ($categories as $categoryid => $fields) {
-        foreach ($fields as $formfield) {
-            if ($formfield->is_visible() and !$formfield->is_empty()) {
-                echo html_writer::tag('dt', format_string($formfield->field->name));
-                echo html_writer::tag('dd', $formfield->display_data());
-            }
-        }
     }
 }
 

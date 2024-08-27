@@ -22,15 +22,16 @@
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
+$string['addsection'] = 'Add section';
 $string['availability_show'] = 'Show on course page';
 $string['availability_show_help'] = 'Available to students (subject to any access restrictions which may be set).';
 $string['availability_hide'] = 'Hide on course page';
 $string['availability_hide_help'] = 'Not available to students.';
 $string['availability_stealth'] = 'Make available but don\'t show on course page';
 $string['availability_stealth_help'] = 'Available to students if you provide a link. Activities will still appear in the gradebook and other reports.';
-$string['bulkedit'] = 'Bulk edit';
+$string['bulkedit'] = 'Bulk actions';
 $string['bulkeditingcourse'] = 'Bulk edit course: {$a}';
-$string['bulkcancel'] = 'Close bulk edit';
+$string['bulkcancel'] = 'Close bulk actions';
 $string['bulkselection'] = '{$a} selected';
 $string['bulkselection_plural'] = '{$a} selected';
 $string['cm_delete_feedback'] = '{$a->name} deleted.';
@@ -41,9 +42,13 @@ $string['cm_hide_feedback'] = '{$a->name} is now hidden.';
 $string['cm_hide_feedback_batch'] = 'The selected {$a->count} activities are now hidden.';
 $string['cm_moveleft_feedback'] = '{$a->name} moved left.';
 $string['cm_moveright_feedback'] = '{$a->name} moved right.';
+$string['cm_nogroups_feedback'] = '{$a->name} group mode changed to No groups.';
+$string['cm_separategroups_feedback'] = '{$a->name} group mode changed to Separate groups.';
 $string['cm_show_feedback'] = '{$a->name} is now shown.';
 $string['cm_show_feedback_batch'] = 'The selected {$a->count} activities are now shown.';
 $string['cm_stealth_feedback'] = '{$a->name} is now available but not shown on the course page.';
+$string['cm_stealth_feedback_batch'] = 'The selected {$a->count} activities are now available but not shown on the course page.';
+$string['cm_visiblegroups_feedback'] = '{$a->name} group mode changed to Visible groups.';
 $string['cmavailability'] = 'Activity availability';
 $string['cmdelete_info'] = 'This will delete {$a->name} and any user data it contains.';
 $string['cmdelete_title'] = 'Delete activity?';
@@ -57,6 +62,7 @@ $string['cmmove_info'] = 'Move {$a} after';
 $string['cmsmove_title'] = 'Move selected activities';
 $string['cmsmove_info'] = 'Move {$a} activities after';
 $string['courseindex'] = 'Course index';
+$string['courseindexoptions'] = 'Course index options';
 $string['nobulkaction'] = 'No bulk actions available';
 $string['preference:coursesectionspreferences'] = 'Section user preferences for course {$a}';
 $string['privacy:metadata:preference:coursesectionspreferences'] = 'Section user preferences like collapsed and expanded.';

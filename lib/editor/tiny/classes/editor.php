@@ -170,7 +170,10 @@ class editor extends \texteditor {
             'context' => $context->id,
 
             // File picker options.
-            'filepicker' => $fpoptions,
+            'filepicker' => (object) $fpoptions,
+
+            // Default draft item ID.
+            'draftitemid' => 0,
 
             'currentLanguage' => current_language(),
 
@@ -194,9 +197,6 @@ class editor extends \texteditor {
 
             // Plugin configuration.
             'plugins' => $this->manager->get_plugin_configuration($context, $options, $fpoptions, $this),
-
-            // Nest menu inside parent DOM.
-            'nestedmenu' => true,
         ];
 
         if (defined('BEHAT_SITE_RUNNING') && BEHAT_SITE_RUNNING) {

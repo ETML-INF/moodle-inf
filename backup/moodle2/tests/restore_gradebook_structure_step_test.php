@@ -63,7 +63,7 @@ class restore_gradebook_structure_step_test extends \advanced_testcase {
      * @param   string  $source     The source file to test
      * @param   string  $expected   The expected result of the transformation
      */
-    public function test_rewrite_step_backup_file_for_legacy_freeze($source, $expected) {
+    public function test_rewrite_step_backup_file_for_legacy_freeze($source, $expected): void {
         $restore = $this->getMockBuilder('\restore_gradebook_structure_step')
             ->onlyMethods([])
             ->disableOriginalConstructor()
@@ -77,7 +77,6 @@ class restore_gradebook_structure_step_test extends \advanced_testcase {
 
         $rc = new \ReflectionClass('\restore_gradebook_structure_step');
         $rcm = $rc->getMethod('rewrite_step_backup_file_for_legacy_freeze');
-        $rcm->setAccessible(true);
         $rcm->invoke($restore, $filepath);
 
         // Check the result.

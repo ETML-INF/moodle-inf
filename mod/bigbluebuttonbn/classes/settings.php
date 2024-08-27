@@ -28,9 +28,11 @@ use admin_setting_configtextarea;
 use admin_setting_heading;
 use admin_settingpage;
 use cache_helper;
+use core_plugin_manager;
 use lang_string;
 use mod_bigbluebuttonbn\local\config;
 use mod_bigbluebuttonbn\local\helpers\roles;
+use mod_bigbluebuttonbn\local\plugins\admin_page_manage_extensions;
 use mod_bigbluebuttonbn\local\proxy\bigbluebutton_proxy;
 
 /**
@@ -45,6 +47,9 @@ class settings {
 
     /** @var admin_category shared value */
     private $admin;
+
+    /** @var bool whether the current user has moodle/site:config capability  */
+    private $hassiteconfig;
 
     /** @var bool Module is enabled */
     private $moduleenabled;
@@ -64,11 +69,13 @@ class settings {
      * @param admin_category $admin
      * @param \core\plugininfo\mod $module
      * @param string $categoryname for the plugin setting (main setting page)
+     * @param bool $hassiteconfig whether the current user has moodle/site:config capability
      */
-    public function __construct(admin_category $admin, \core\plugininfo\mod $module, string $categoryname) {
+    public function __construct(admin_category $admin, \core\plugininfo\mod $module, string $categoryname, bool $hassiteconfig) {
         $this->moduleenabled = $module->is_enabled() === true;
         $this->admin = $admin;
         $this->section = $categoryname;
+        $this->hassiteconfig = $hassiteconfig;
 
         $modbigbluebuttobnfolder = new admin_category(
             $this->parent,
@@ -108,6 +115,14 @@ class settings {
         $this->add_extended_settings();
         // Renders settings for experimental features.
         $this->add_experimental_settings();
+
+        // Add all subplugin settings if any.
+        $this->admin->add($this->parent, new admin_category('bbbextplugins',
+            new lang_string('subplugintype_bbbext', 'mod_bigbluebuttonbn'), !$this->moduleenabled));
+        $this->admin->add($this->parent, new admin_page_manage_extensions());
+        foreach (core_plugin_manager::instance()->get_plugins_of_type(extension::BBB_EXTENSION_PLUGIN_NAME) as $plugin) {
+            $plugin->load_settings($this->admin, extension::BBB_EXTENSION_PLUGIN_NAME, $this->hassiteconfig);
+        }
     }
 
     /**
@@ -137,7 +152,7 @@ class settings {
      * @throws \coding_exception
      */
     protected function add_general_settings(): admin_settingpage {
-        global $CFG;
+        global $CFG, $OUTPUT;
         $settingsgeneral = new admin_settingpage(
             $this->section,
             get_string('config_general', 'bigbluebuttonbn'),
@@ -152,12 +167,12 @@ class settings {
             );
             $settingsgeneral->add($item);
 
-            if (empty($CFG->bigbluebuttonbn_default_dpa_accepted)) {
-                $settingsgeneral->add(new admin_setting_configcheckbox(
-                    'bigbluebuttonbn_default_dpa_accepted',
-                    get_string('acceptdpa', 'mod_bigbluebuttonbn'),
-                    get_string('enablingbigbluebuttondpainfo', 'mod_bigbluebuttonbn', config::DEFAULT_DPA_URL),
-                    0
+            if (config::server_credentials_invalid()) {
+                // A notification should appear when default credentials are used.
+                $settingsgeneral->add(new admin_setting_heading(
+                    'bigbluebuttonbn_notification',
+                    '',
+                    $OUTPUT->notification(get_string('credentials_warning', 'mod_bigbluebuttonbn'), 'error')
                 ));
             }
 
@@ -165,7 +180,7 @@ class settings {
                 'bigbluebuttonbn_server_url',
                 get_string('config_server_url', 'bigbluebuttonbn'),
                 get_string('config_server_url_description', 'bigbluebuttonbn'),
-                config::DEFAULT_SERVER_URL,
+                '',
                 PARAM_RAW
             );
             $item->set_updatedcallback(
@@ -184,7 +199,7 @@ class settings {
                 'bigbluebuttonbn_shared_secret',
                 get_string('config_shared_secret', 'bigbluebuttonbn'),
                 get_string('config_shared_secret_description', 'bigbluebuttonbn'),
-                config::DEFAULT_SHARED_SECRET
+                ''
             );
             $this->add_conditional_element(
                 'shared_secret',
@@ -205,16 +220,6 @@ class settings {
                 $settingsgeneral
             );
 
-            $item = new \admin_setting_description(
-                'bigbluebuttonbn_dpa_info',
-                '',
-                get_string('config_dpa_note', 'bigbluebuttonbn', config::DEFAULT_DPA_URL),
-            );
-            $this->add_conditional_element(
-                'dpa_info',
-                $item,
-                $settingsgeneral
-            );
             $item = new admin_setting_configtext(
                 'bigbluebuttonbn_poll_interval',
                 get_string('config_poll_interval', 'bigbluebuttonbn'),

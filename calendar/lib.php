@@ -1121,7 +1121,7 @@ class calendar_information {
      *                                  If a courseid is specified, this value is ignored.
      * @return  calendar_information
      */
-    public static function create($time, int $courseid, int $categoryid = null) : calendar_information {
+    public static function create($time, int $courseid, int $categoryid = null): calendar_information {
         $calendar = new static(0, 0, 0, $time);
         if ($courseid != SITEID && !empty($courseid)) {
             // Course ID must be valid and existing.
@@ -1672,11 +1672,14 @@ function calendar_get_events_by_id($eventids) {
 /**
  * Get control options for calendar.
  *
+ * @deprecated since Moodle 4.3
  * @param string $type of calendar
  * @param array $data calendar information
- * @return string $content return available control for the calender in html
+ * @return string $content return available control for the calendar in html
  */
 function calendar_top_controls($type, $data) {
+    debugging(__FUNCTION__ . ' has been deprecated and should not be used anymore.', DEBUG_DEVELOPER);
+
     global $PAGE, $OUTPUT;
 
     // Get the calendar type we are using.
@@ -1933,6 +1936,7 @@ function calendar_get_link_href($linkbase, $d, $m, $y, $time = 0) {
 /**
  * Build and return a previous month HTML link, with an arrow.
  *
+ * @deprecated since Moodle 4.3
  * @param string $text The text label.
  * @param string|moodle_url $linkbase The URL stub.
  * @param int $d The number of the date.
@@ -1944,6 +1948,8 @@ function calendar_get_link_href($linkbase, $d, $m, $y, $time = 0) {
  * @return string HTML string.
  */
 function calendar_get_link_previous($text, $linkbase, $d, $m, $y, $accesshide = false, $time = 0) {
+    debugging(__FUNCTION__ . ' has been deprecated and should not be used anymore.', DEBUG_DEVELOPER);
+
     $href = calendar_get_link_href(new \moodle_url($linkbase), $d, $m, $y, $time);
 
     if (empty($href)) {
@@ -1961,6 +1967,7 @@ function calendar_get_link_previous($text, $linkbase, $d, $m, $y, $accesshide = 
 /**
  * Build and return a next month HTML link, with an arrow.
  *
+ * @deprecated since Moodle 4.3
  * @param string $text The text label.
  * @param string|moodle_url $linkbase The URL stub.
  * @param int $d the number of the Day
@@ -1972,6 +1979,8 @@ function calendar_get_link_previous($text, $linkbase, $d, $m, $y, $accesshide = 
  * @return string HTML string.
  */
 function calendar_get_link_next($text, $linkbase, $d, $m, $y, $accesshide = false, $time = 0) {
+    debugging(__FUNCTION__ . ' has been deprecated and should not be used anymore.', DEBUG_DEVELOPER);
+
     $href = calendar_get_link_href(new \moodle_url($linkbase), $d, $m, $y, $time);
 
     if (empty($href)) {
@@ -2168,29 +2177,27 @@ function calendar_set_filters(array $courseeventsfrom, $ignorefilters = false, s
     }
 
     if (!empty($courseeventsfrom) && (calendar_show_event_type(CALENDAR_EVENT_GROUP, $user) || $ignorefilters)) {
-
-        if (count($courseeventsfrom) == 1) {
-            $course = reset($courseeventsfrom);
-            if (has_any_capability($allgroupscaps, \context_course::instance($course->id))) {
-                $coursegroups = groups_get_all_groups($course->id, 0, 0, 'g.id');
-                $group = array_keys($coursegroups);
-            }
-        }
-        if ($group === false) {
-            if (!empty($CFG->calendar_adminseesall) && has_any_capability($allgroupscaps, \context_system::instance())) {
-                $group = true;
-            } else if ($isvaliduser) {
-                $groupids = array();
-                foreach ($courseeventsfrom as $courseid => $course) {
-                    if ($course->groupmode != NOGROUPS || !$course->groupmodeforce) {
-                        // If this course has groups, show events from all of those related to the current user.
+        if (!empty($CFG->calendar_adminseesall) && has_any_capability($allgroupscaps, \context_system::instance())) {
+            $group = true;
+        } else if ($isvaliduser) {
+            $groupids = [];
+            foreach ($courseeventsfrom as $courseid => $course) {
+                if ($course->groupmode != NOGROUPS || !$course->groupmodeforce) {
+                    if (has_all_capabilities($allgroupscaps, \context_course::instance($courseid))) {
+                        // User can access all groups in this course.
+                        // Get all the groups in this course.
+                        $coursegroups = groups_get_all_groups($course->id, 0, 0, 'g.id');
+                        $groupids = array_merge($groupids, array_keys($coursegroups));
+                    } else {
+                        // User can only access their own groups.
+                        // Get the groups the user is in.
                         $coursegroups = groups_get_user_groups($course->id, $user->id);
                         $groupids = array_merge($groupids, $coursegroups['0']);
                     }
                 }
-                if (!empty($groupids)) {
-                    $group = $groupids;
-                }
+            }
+            if (!empty($groupids)) {
+                $group = $groupids;
             }
         }
     }
@@ -3576,6 +3583,18 @@ function calendar_get_view(\calendar_information $calendar, $view, $includenavig
             $data->showviewselector = true;
         } else if ($view == "upcoming_mini") {
             $template = 'core_calendar/calendar_upcoming_mini';
+        }
+    }
+
+    // Check if $data has events.
+    if (isset($data->events)) {
+        // Let's check and sanitize all "name" in $data->events before it's sent to front end.
+        foreach ($data->events as $d) {
+            $name = $d->name ?? null;
+            // Encode special characters if our decoded name does not match the original name.
+            if ($name && (html_entity_decode($name) !== $name)) {
+                $d->name = htmlspecialchars(html_entity_decode($name), ENT_QUOTES, 'utf-8');
+            }
         }
     }
 

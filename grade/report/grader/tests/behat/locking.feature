@@ -54,10 +54,10 @@ Feature: Locking Grade Items and Categories in Gradebook
     And I click on grade item menu "Manual grade 1" of type "gradeitem" on "grader" page
     And I choose "Edit grade item" in the open action menu
     And I set the field "Locked" to "1"
-    And I press "Save changes"
+    And I click on "Save" "button" in the "Edit grade item" "dialogue"
     And I click on grade item menu "Manual grade 1" of type "gradeitem" on "grader" page
     And I choose "Edit grade item" in the open action menu
     And I set the field "Locked" to "0"
-    And I press "Save changes"
+    And I click on "Save" "button" in the "Edit grade item" "dialogue"
     Then "Locked" "icon" should exist in the "Student 1" "table_row"
     And "Locked" "icon" should not exist in the "Student 2" "table_row"

@@ -621,6 +621,9 @@ class grade_report_grader extends grade_report {
     public function get_left_rows($displayaverages) {
         global $CFG, $OUTPUT;
 
+        // Course context to determine how the user details should be displayed.
+        $coursecontext = context_course::instance($this->courseid);
+
         $rows = [];
 
         $showuserimage = $this->get_pref('showuserimage');
@@ -673,7 +676,10 @@ class grade_report_grader extends grade_report {
             $fieldheader->scope = 'col';
             $fieldheader->header = true;
 
-            $collapsecontext = ['field' => $field, 'name' => $field];
+            $collapsecontext = [
+                'field' => $field,
+                'name' => \core_user\fields::get_display_name($field),
+            ];
 
             $collapsedicon = $OUTPUT->render_from_template('gradereport_grader/collapse/icon', $collapsecontext);
             // Need to wrap the button into a div with our hooking element for user items, gradeitems already have this.
@@ -703,14 +709,16 @@ class grade_report_grader extends grade_report {
             $usercell->scope = 'row';
 
             if ($showuserimage) {
-                $usercell->text = $OUTPUT->user_picture($user, ['link' => false, 'visibletoscreenreaders' => false]);
+                $usercell->text = $OUTPUT->render(\core_user::get_profile_picture($user, $coursecontext, [
+                    'link' => false, 'visibletoscreenreaders' => false
+                ]));
             }
 
             $fullname = fullname($user, $viewfullnames);
             $usercell->text = html_writer::link(
-                    new moodle_url('/user/view.php', ['id' => $user->id, 'course' => $this->course->id]),
-                    $usercell->text . $fullname,
-                    ['class' => 'username']
+                \core_user::get_profile_url($user, $coursecontext),
+                $usercell->text . $fullname,
+                ['class' => 'username']
             );
 
             if (!empty($user->suspendedenrolment)) {
@@ -732,11 +740,17 @@ class grade_report_grader extends grade_report {
             $userrow->cells[] = $usercell;
 
             foreach ($extrafields as $field) {
+                $fieldcellcontent = s($user->$field);
+                if ($field === 'country') {
+                    $countries = get_string_manager()->get_list_of_countries();
+                    $fieldcellcontent = $countries[$user->$field] ?? $fieldcellcontent;
+                }
+
                 $fieldcell = new html_table_cell();
                 $fieldcell->attributes['class'] = 'userfield user' . $field;
                 $fieldcell->attributes['data-col'] = $field;
                 $fieldcell->header = false;
-                $fieldcell->text = html_writer::tag('div', s($user->{$field}), [
+                $fieldcell->text = html_writer::tag('div', $fieldcellcontent, [
                     'data-collapse' => 'content'
                 ]);
 
@@ -761,12 +775,12 @@ class grade_report_grader extends grade_report {
      * @param boolean $displayaverages whether to display average rows in the table
      * @return array Array of html_table_row objects
      */
-    public function get_right_rows(bool $displayaverages) : array {
+    public function get_right_rows(bool $displayaverages): array {
         global $CFG, $USER, $OUTPUT, $DB, $PAGE;
 
         $rows = [];
         $this->rowcount = 0;
-        $strgrade = \grade_helper::get_lang_string('gradenoun');
+        $strgrade = get_string('gradenoun');
         $this->get_sort_arrows();
 
         // Get preferences once.
@@ -875,8 +889,8 @@ class grade_report_grader extends grade_report {
                     if (!$element['object']->is_aggregate_item()) {
                         $collapsedicon = $OUTPUT->render_from_template('gradereport_grader/collapse/icon', $collapsecontext);
                     }
-                    $headerlink = $this->gtree->get_element_header($element, true,
-                        true, false, false, true, $sortlink);
+                    $headerlink = grade_helper::get_element_header($element, true,
+                        true, false, false, true);
 
                     $itemcell = new html_table_cell();
                     $itemcell->attributes['class'] = $type . ' ' . $catlevel .
@@ -1046,9 +1060,9 @@ class grade_report_grader extends grade_report {
                         if ($quickgrading && $grade->is_editable()) {
                             $context->iseditable = true;
                             if (empty($item->outcomeid)) {
-                                $nogradestr = \grade_helper::get_lang_string('nograde');
+                                $nogradestr = get_string('nograde');
                             } else {
-                                $nogradestr = \grade_helper::get_lang_string('nooutcome', 'grades');
+                                $nogradestr = get_string('nooutcome', 'grades');
                             }
                             $attributes = [
                                 'id' => 'grade_' . $userid . '_' . $item->id
@@ -1183,12 +1197,64 @@ class grade_report_grader extends grade_report {
         }
 
         $rows = $this->get_right_range_row($rows);
-        if ($displayaverages) {
-            $rows = $this->get_right_avg_row($rows, true);
-            $rows = $this->get_right_avg_row($rows);
+        if ($displayaverages && $this->canviewhidden) {
+            $showonlyactiveenrol = $this->show_only_active();
+
+            if ($this->currentgroup) {
+                $ungradedcounts = $this->ungraded_counts(true, true, $showonlyactiveenrol);
+                $rows[] = $this->format_averages($ungradedcounts);
+            }
+
+            $ungradedcounts = $this->ungraded_counts(false, true, $showonlyactiveenrol);
+            $rows[] = $this->format_averages($ungradedcounts);
         }
 
         return $rows;
+    }
+
+    /**
+     * Returns a row of grade items averages
+     *
+     * @param grade_item $gradeitem Grade item.
+     * @param array|null $aggr Average value and meancount information.
+     * @param bool|null $shownumberofgrades Whether to show number of grades.
+     * @return html_table_cell Formatted average cell.
+     */
+    protected function format_average_cell(grade_item $gradeitem, ?array $aggr = null, ?bool $shownumberofgrades = null): html_table_cell {
+        global $OUTPUT;
+
+        if ($gradeitem->needsupdate) {
+            $avgcell = new html_table_cell();
+            $avgcell->attributes['class'] = 'i' . $gradeitem->id;
+            $avgcell->text = $OUTPUT->container(get_string('error'), 'gradingerror');
+        } else {
+            $gradetypeclass = '';
+            if ($gradeitem->gradetype == GRADE_TYPE_SCALE) {
+                $gradetypeclass = ' grade_type_scale';
+            } else if ($gradeitem->gradetype == GRADE_TYPE_VALUE) {
+                $gradetypeclass = ' grade_type_value';
+            } else if ($gradeitem->gradetype == GRADE_TYPE_TEXT) {
+                $gradetypeclass = ' grade_type_text';
+            }
+
+            if (empty($aggr['average'])) {
+                $avgcell = new html_table_cell();
+                $avgcell->attributes['class'] = $gradetypeclass . ' i' . $gradeitem->id;
+                $avgcell->attributes['data-itemid'] = $gradeitem->id;
+                $avgcell->text = html_writer::div('-', '', ['data-collapse' => 'avgrowcell']);
+            } else {
+                $numberofgrades = '';
+                if ($shownumberofgrades) {
+                    $numberofgrades = " (" . $aggr['meancount'] . ")";
+                }
+
+                $avgcell = new html_table_cell();
+                $avgcell->attributes['class'] = $gradetypeclass . ' i' . $gradeitem->id;
+                $avgcell->attributes['data-itemid'] = $gradeitem->id;
+                $avgcell->text = html_writer::div($aggr['average'] . $numberofgrades, '', ['data-collapse' => 'avgrowcell']);
+            }
+        }
+        return $avgcell;
     }
 
     /**
@@ -1244,7 +1310,7 @@ class grade_report_grader extends grade_report {
             $controlscell->attributes['class'] = 'header controls';
             $controlscell->header = true;
             $controlscell->colspan = $colspan;
-            $controlscell->text = \grade_helper::get_lang_string('controls', 'grades');
+            $controlscell->text = get_string('controls', 'grades');
             $controlsrow->cells[] = $controlscell;
 
             $rows[] = $controlsrow;
@@ -1269,7 +1335,7 @@ class grade_report_grader extends grade_report {
             $rangecell->colspan = $colspan;
             $rangecell->header = true;
             $rangecell->scope = 'row';
-            $rangecell->text = \grade_helper::get_lang_string('range', 'grades');
+            $rangecell->text = get_string('range', 'grades');
             $rangerow->cells[] = $rangecell;
             $rows[] = $rangerow;
         }
@@ -1397,6 +1463,7 @@ class grade_report_grader extends grade_report {
     }
 
     /**
+     * @deprecated since Moodle 4.4 - Call calculate_average instead.
      * Builds and return the row of averages for the right part of the grader report.
      * @param array $rows Whether to return only group averages or all averages.
      * @param bool $grouponly Whether to return only group averages or all averages.
@@ -1404,6 +1471,10 @@ class grade_report_grader extends grade_report {
      */
     public function get_right_avg_row($rows=array(), $grouponly=false) {
         global $USER, $DB, $OUTPUT, $CFG;
+
+        debugging('grader_report_grader::get_right_avg_row() is deprecated.
+            Call grade_report::calculate_average() instead.', DEBUG_DEVELOPER);
+
         if (!$this->canviewhidden) {
             // Totals might be affected by hiding, if user can not see hidden grades the aggregations might be altered
             // better not show them at all if user can not see all hidden grades.
@@ -1887,9 +1958,7 @@ class grade_report_grader extends grade_report {
         $requirednames = order_in_string(\core_user\fields::get_name_fields(), $nameformat);
         if (!empty($requirednames)) {
             foreach ($requirednames as $name) {
-                $arrows['studentname'] .= html_writer::link(
-                    new moodle_url($this->baseurl, array('sortitemid' => $name)), \grade_helper::get_lang_string($name)
-                );
+                $arrows['studentname'] .= get_string($name);
                 if ($this->sortitemid == $name) {
                     $sortlink->param('sortitemid', $name);
                     if ($this->sortorder == 'ASC') {
@@ -1913,10 +1982,8 @@ class grade_report_grader extends grade_report {
             if (preg_match(\core_user\fields::PROFILE_FIELD_REGEX, $field)) {
                 $attributes['data-collapse-name'] = \core_user\fields::get_display_name($field);
             }
-            $fieldlink = html_writer::link(new moodle_url($this->baseurl, ['sortitemid' => $field]),
-                \core_user\fields::get_display_name($field), $attributes);
-            $arrows[$field] = $fieldlink;
 
+            $arrows[$field] = html_writer::span(\core_user\fields::get_display_name($field), '', $attributes);
             if ($field == $this->sortitemid) {
                 $sortlink->param('sortitemid', $field);
 
@@ -2074,9 +2141,9 @@ function gradereport_grader_get_report_link(context_course $context, int $course
         $categoryid = $element['object']->id;
 
         // Load language strings.
-        $strswitchminus = grade_helper::get_lang_string('aggregatesonly', 'grades');
-        $strswitchplus = grade_helper::get_lang_string('gradesonly', 'grades');
-        $strswitchwhole = grade_helper::get_lang_string('fullmode', 'grades');
+        $strswitchminus = get_string('aggregatesonly', 'grades');
+        $strswitchplus = get_string('gradesonly', 'grades');
+        $strswitchwhole = get_string('fullmode', 'grades');
 
         $url = new moodle_url($gpr->get_return_url(null, ['target' => $element['eid'], 'sesskey' => sesskey()]));
 

@@ -21,11 +21,11 @@
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 import * as Repository from 'gradereport_grader/collapse/repository';
-import GradebookSearchClass from 'gradereport_grader/search/search_class';
+import search_combobox from 'core/comboboxsearch/search_combobox';
 import {renderForPromise, replaceNodeContents, replaceNode} from 'core/templates';
 import {debounce} from 'core/utils';
 import $ from 'jquery';
-import {get_strings as getStrings} from 'core/str';
+import {getStrings} from 'core/str';
 import CustomEvents from "core/custom_interaction_events";
 import storage from 'core/localstorage';
 import {addIconToContainer} from 'core/loadingicon';
@@ -39,7 +39,8 @@ const selectors = {
     formItems: {
         cancel: 'cancel',
         save: 'save',
-        checked: 'input[type="checkbox"]:checked'
+        checked: 'input[type="checkbox"]:checked',
+        currentlyUnchecked: 'input[type="checkbox"]:not([data-action="selectall"])',
     },
     hider: 'hide',
     expand: 'expand',
@@ -55,11 +56,12 @@ const selectors = {
     count: '[data-collapse="count"]',
     placeholder: '.collapsecolumndropdown [data-region="placeholder"]',
     fullDropdown: '.collapsecolumndropdown',
+    searchResultContainer: '.searchresultitemscontainer',
 };
 
 const countIndicator = document.querySelector(selectors.count);
 
-export default class ColumnSearch extends GradebookSearchClass {
+export default class ColumnSearch extends search_combobox {
 
     userID = -1;
     courseID = null;
@@ -97,6 +99,19 @@ export default class ColumnSearch extends GradebookSearchClass {
                 document.querySelector('.gradereport-grader-table').classList.remove('d-none');
             }, 10);
         }).then(() => pendingPromise.resolve()).catch(Notification.exception);
+
+        this.$component.on('hide.bs.dropdown', () => {
+            const searchResultContainer = this.component.querySelector(selectors.searchResultContainer);
+            searchResultContainer.scrollTop = 0;
+
+            // Use setTimeout to make sure the following code is executed after the click event is handled.
+            setTimeout(() => {
+                if (this.searchInput.value !== '') {
+                    this.searchInput.value = '';
+                    this.searchInput.dispatchEvent(new Event('input', {bubbles: true}));
+                }
+            });
+        });
     }
 
     /**
@@ -104,7 +119,7 @@ export default class ColumnSearch extends GradebookSearchClass {
      *
      * @returns {string}
      */
-    setComponentSelector() {
+    componentSelector() {
         return '.collapse-columns';
     }
 
@@ -113,17 +128,8 @@ export default class ColumnSearch extends GradebookSearchClass {
      *
      * @returns {string}
      */
-    setDropdownSelector() {
+    dropdownSelector() {
         return '.searchresultitemscontainer';
-    }
-
-    /**
-     * The triggering div that contains the searching widget.
-     *
-     * @returns {string}
-     */
-    setTriggerSelector() {
-        return '.collapsecolumn';
     }
 
     /**
@@ -197,7 +203,7 @@ export default class ColumnSearch extends GradebookSearchClass {
             if (idx === -1) {
                 this.getDataset().push(desiredToHide);
             }
-            await this.prefcountpippe();
+            await this.prefcountpipe();
 
             this.nodesUpdate(desiredToHide);
         }
@@ -210,29 +216,10 @@ export default class ColumnSearch extends GradebookSearchClass {
             const idx = this.getDataset().indexOf(desiredToHide);
             this.getDataset().splice(idx, 1);
 
-            await this.prefcountpippe();
+            await this.prefcountpipe();
 
             this.nodesUpdate(e.target.closest(selectors.colVal)?.dataset.col);
             this.nodesUpdate(e.target.closest(selectors.colVal)?.dataset.itemid);
-        }
-    }
-
-    /**
-     * The handler for when a user presses a key within the component.
-     *
-     * @param {KeyboardEvent} e The triggering event that we are working with.
-     */
-    async keyHandler(e) {
-        super.keyHandler(e);
-
-        // Switch the key presses to handle keyboard nav.
-        switch (e.key) {
-            case 'Tab':
-                if (e.target.closest(this.selectors.input)) {
-                    e.preventDefault();
-                    this.clearSearchButton.focus({preventScroll: true});
-                }
-                break;
         }
     }
 
@@ -242,6 +229,11 @@ export default class ColumnSearch extends GradebookSearchClass {
     registerInputEvents() {
         // Register & handle the text input.
         this.searchInput.addEventListener('input', debounce(async() => {
+            if (this.getSearchTerm() === this.searchInput.value && this.searchResultsVisible()) {
+                window.console.warn(`Search term matches input value - skipping`);
+                // Debounce can happen multiple times quickly.
+                return;
+            }
             this.setSearchTerms(this.searchInput.value);
             // We can also require a set amount of input before search.
             if (this.searchInput.value === '') {
@@ -251,9 +243,13 @@ export default class ColumnSearch extends GradebookSearchClass {
                 // Display the "clear" search button in the search bar.
                 this.clearSearchButton.classList.remove('d-none');
             }
+            const pendingPromise = new Pending();
             // User has given something for us to filter against.
-            await this.filterrenderpipe();
-        }, 300));
+            await this.filterrenderpipe().then(() => {
+                pendingPromise.resolve();
+                return true;
+            });
+        }, 300, {pending: true}));
     }
 
     /**
@@ -268,13 +264,20 @@ export default class ColumnSearch extends GradebookSearchClass {
         ];
         CustomEvents.define(document, events);
 
+        const selectall = form.querySelector('[data-action="selectall"]');
+
         // Register clicks & keyboard form handling.
         events.forEach((event) => {
+            const submitBtn = form.querySelector(`[data-action="${selectors.formItems.save}"`);
             form.addEventListener(event, (e) => {
                 // Stop Bootstrap from being clever.
                 e.stopPropagation();
-                const submitBtn = form.querySelector(`[data-action="${selectors.formItems.save}"`);
-                if (e.target.closest('input')) {
+                const input = e.target.closest('input');
+                if (input) {
+                    // If the user is unchecking an item, we need to uncheck the select all if it's checked.
+                    if (selectall.checked && !input.checked) {
+                        selectall.checked = false;
+                    }
                     const checkedCount = Array.from(form.querySelectorAll(selectors.formItems.checked)).length;
                     // Check if any are clicked or not then change disabled.
                     submitBtn.disabled = checkedCount <= 0;
@@ -288,6 +291,23 @@ export default class ColumnSearch extends GradebookSearchClass {
                 this.searchInput.value = '';
                 this.setSearchTerms(this.searchInput.value);
                 await this.filterrenderpipe();
+            });
+            selectall.addEventListener(event, (e) => {
+                // Stop Bootstrap from being clever.
+                e.stopPropagation();
+                if (!selectall.checked) {
+                    const touncheck = Array.from(form.querySelectorAll(selectors.formItems.checked));
+                    touncheck.forEach(item => {
+                        item.checked = false;
+                    });
+                    submitBtn.disabled = true;
+                } else {
+                    const currentUnchecked = Array.from(form.querySelectorAll(selectors.formItems.currentlyUnchecked));
+                    currentUnchecked.forEach(item => {
+                        item.checked = true;
+                    });
+                    submitBtn.disabled = false;
+                }
             });
         });
 
@@ -304,7 +324,10 @@ export default class ColumnSearch extends GradebookSearchClass {
                 this.getDataset().splice(idx, 1);
                 this.nodesUpdate(item.dataset.collapse);
             });
-            await this.prefcountpippe();
+            // Reset the check all & submit to false just in case.
+            selectall.checked = false;
+            e.submitter.disabled = true;
+            await this.prefcountpipe();
         });
     }
 
@@ -320,7 +343,7 @@ export default class ColumnSearch extends GradebookSearchClass {
      *
      * @returns {Promise<void>}
      */
-    async prefcountpippe() {
+    async prefcountpipe() {
         this.setPreferences();
         this.countUpdate();
         await this.filterrenderpipe();
@@ -376,18 +399,6 @@ export default class ColumnSearch extends GradebookSearchClass {
     }
 
     /**
-     * Update any changeable nodes, filter and then render the result.
-     *
-     * @returns {Promise<void>}
-     */
-    async filterrenderpipe() {
-        this.updateNodes();
-        this.setMatchedResults(await this.filterDataset(this.getDataset()));
-        this.filterMatchDataset();
-        await this.renderDropdown();
-    }
-
-    /**
      * With an array of nodes, switch their classes and values.
      */
     updateDisplay() {
@@ -414,8 +425,6 @@ export default class ColumnSearch extends GradebookSearchClass {
                     const rowCell = avgRowCell ?? rangeRowCell;
 
                     rowCell?.classList.toggle('d-none');
-                    rowCell?.setAttribute('aria-hidden',
-                        rowCell?.classList.contains('d-none') ? 'true' : 'false');
                 } else if (content.classList.contains('d-none')) {
                     // We should always have content but some cells do not contain menus or other actions.
                     element.classList.remove('collapsed');
@@ -425,19 +434,15 @@ export default class ColumnSearch extends GradebookSearchClass {
                     }
                     nodeSet.forEach(node => {
                         node?.classList.remove('d-none');
-                        node?.setAttribute('aria-hidden', 'false');
                     });
                     expandButton?.classList.add('d-none');
-                    expandButton?.setAttribute('aria-hidden', 'true');
                 } else {
                     element.classList.add('collapsed');
                     content.classList.remove('d-flex');
                     nodeSet.forEach(node => {
                         node?.classList.add('d-none');
-                        node?.setAttribute('aria-hidden', 'true');
                     });
                     expandButton?.classList.remove('d-none');
-                    expandButton?.setAttribute('aria-hidden', 'false');
                 }
             }
         });
@@ -467,6 +472,7 @@ export default class ColumnSearch extends GradebookSearchClass {
         // Update the collapsed button pill.
         this.countUpdate();
         const {html, js} = await renderForPromise('gradereport_grader/collapse/collapsebody', {
+            'instance': this.instance,
             'results': this.getMatchedResults(),
             'userid': this.userID,
         });
@@ -480,6 +486,7 @@ export default class ColumnSearch extends GradebookSearchClass {
         // Add a small BS listener so that we can set the focus correctly on open.
         this.$component.on('shown.bs.dropdown', () => {
             this.searchInput.focus({preventScroll: true});
+            this.selectallEnable();
         });
     }
 
@@ -488,10 +495,25 @@ export default class ColumnSearch extends GradebookSearchClass {
      */
     async renderDropdown() {
         const {html, js} = await renderForPromise('gradereport_grader/collapse/collapseresults', {
+            instance: this.instance,
             'results': this.getMatchedResults(),
             'searchTerm': this.getSearchTerm(),
         });
         replaceNodeContents(this.getHTMLElements().searchDropdown, html, js);
+        this.selectallEnable();
+        // Reset the expand button to be disabled as we have re-rendered the dropdown.
+        const form = this.component.querySelector(selectors.formDropdown);
+        const expandButton = form.querySelector(`[data-action="${selectors.formItems.save}"`);
+        expandButton.disabled = true;
+    }
+
+    /**
+     * Given we render the dropdown, Determine if we want to enable the select all checkbox.
+     */
+    selectallEnable() {
+        const form = this.component.querySelector(selectors.formDropdown);
+        const selectall = form.querySelector('[data-action="selectall"]');
+        selectall.disabled = this.getMatchedResults().length === 0;
     }
 
     /**

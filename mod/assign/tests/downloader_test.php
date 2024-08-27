@@ -57,7 +57,7 @@ class downloader_test extends \advanced_testcase {
         bool $blindmarking,
         bool $downloadasfolder,
         array $expected
-    ) {
+    ): void {
         global $CFG;
         $this->resetAfterTest();
         $this->setAdminUser();
@@ -134,7 +134,6 @@ class downloader_test extends \advanced_testcase {
         // Expose protected filelist attribute.
         $rc = new \ReflectionClass(downloader::class);
         $rcp = $rc->getProperty('filesforzipping');
-        $rcp->setAccessible(true);
 
         // Add some replacements.
         $search = ['PARTICIPANT', 'DEFAULTTEAM'];

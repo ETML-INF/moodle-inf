@@ -111,7 +111,6 @@ $string['cannotinsertrecord'] = 'Could not insert new record ID {$a}';
 $string['cannotmailconfirm'] = 'Error sending password change confirmation email';
 $string['cannotmanualctrack'] = 'Activity does not provide manual completion tracking';
 $string['cannotmapfield'] = 'Mapping collision detected - two fields maps to the same grade item {$a}';
-$string['cannotmarktopic'] = 'Could not mark that topic for this course';
 $string['cannotmigratedatacomments'] = 'Cannot migrate data module comments';
 $string['cannotmodulename'] = 'Cannot get the module name in build navigation';
 $string['cannotmoduletype'] = 'Cannot get the module type in build navigation';
@@ -427,6 +426,8 @@ $string['moduledoesnotexist'] = 'This module does not exist';
 $string['moduleinstancedoesnotexist'] = 'The instance of this module does not exist';
 $string['modulemissingcode'] = 'Module {$a} is missing the code needed to perform this function';
 $string['moodlenet:invalidshareformat'] = 'Incorrect MoodleNet share format';
+$string['moodlenet:invalidsharestatus'] = 'Incorrect MoodleNet share status';
+$string['moodlenet:invalidsharetype'] = 'Invalid MoodleNet share type';
 $string['moodlenet:usernotconfigured'] = 'You do not have permission to share content to MoodleNet, or your account is incorrectly configured.';
 $string['movecatcontentstoroot'] = 'Moving the category content to root is not allowed. You must move the contents to an existing category!';
 $string['movecatcontentstoselected'] = 'Some category content cannot be moved into the selected category.';
@@ -499,18 +500,19 @@ $string['opensslsignerror'] = 'OpenSSL unable to sign data';
 $string['opensslsealerror'] = 'OpenSSL unable to seal data';
 $string['pagenotexisttitle'] = '404 Error: File not found';
 $string['pagenotexist'] = '<p>An unusual error occurred trying to view a page that does not exist:</p>{$a}';
+$string['passwordexceeded'] = 'The password can\'t be more than {$a} characters.';
 $string['pathdoesnotstartslash'] = 'No valid arguments supplied, path does not start with slash!';
 $string['pleasereport'] = 'If you have time, please let us know what you were trying to do when the error occurred:';
+$string['pluginnotexist'] = '{$a} plugin doesn\'t exist';
 $string['pluginrequirementsnotmet'] = 'Plugin "{$a->pluginname}" ({$a->pluginversion}) could not be installed.  It requires a newer version of Moodle (currently you are using {$a->currentmoodle}, you need {$a->requiremoodle}).';
 $string['pluginunsupported'] = 'Plugin "{$a->pluginname}" {$a->pluginversion} does not support this version of Moodle {$a->moodleversion}. Seek plugin information to find supported versions.';
 $string['prefixcannotbeempty'] = '<p>Error: database table prefix cannot be empty ({$a})</p>
 <p>The site administrator must fix this problem.</p>';
-$string['prefixtoolong'] = '<p>Error: database table prefix is too long ({$a->dbfamily})</p>
-<p>The site administrator must fix this problem. Maximum length for table prefixes in {$a->dbfamily} is {$a->maxlength} characters.</p>';
 $string['privatefilesupload'] = 'Uploading directly to user private files area is no longer supported. Upload to a draft area and then move the files with core_user::add_user_private_files';
 $string['processingstops'] = 'Processing stops here. Remaining records ignored.';
 $string['querystringcannotbeempty'] = 'The query string cannot be empty.';
 $string['redirecterrordetected'] = 'Unsupported redirect detected, script execution terminated';
+$string['redissessionhandlerproblem'] = 'Setting up of redis session failed. Please notify the server administrator.';
 $string['refoundto'] = 'Can be refunded to {$a}';
 $string['refoundtoorigi'] = 'Refunded to original amount: {$a}';
 $string['registrationdisabled'] = 'Registration is disabled on this site';
@@ -586,7 +588,6 @@ $string['unknowncourserequest'] = 'Unknown course request';
 $string['unknownevent'] = 'Unknown event';
 $string['unknownfiletype'] = 'Error unknown filtertype';
 $string['unknowngroup'] = 'Unknown group "{$a}"';
-$string['unknownhelp'] = 'Unknown help topic {$a}';
 $string['unknownjsinrequirejs'] = 'Cannot find JavaScript library {$a}.';
 $string['unknownmodulename'] = 'Unknown module name for form';
 $string['unknownrole'] = 'Unknown role "{$a}"';
@@ -614,6 +615,7 @@ $string['usermustbemnet'] = 'Users in the MNET access control list must be remot
 $string['usernamelowercase'] = 'The username must be in lower case';
 $string['usernotaddederror'] = 'User not added - error';
 $string['usernotaddedregistered'] = 'User not added - already registered';
+$string['usernotaddedusernameexists'] = 'User not added - username already exists under a different email';
 $string['usernotavailable'] = 'The details of this user are not available to you';
 $string['usernotdeletedadmin'] = 'User not deleted as administrator accounts cannot be deleted.';
 $string['usernotdeleteddeleted'] = 'This user has already been deleted.';
@@ -649,3 +651,11 @@ $string['protected_cc_not_supported'] = 'Protected cartridges not supported.';
 
 // Deprecated since Moodle 4.1.
 $string['cannotswitcheditmodeon'] = 'Could not switch edit mode on';
+
+// Deprecated since Moodle 4.3.
+$string['prefixtoolong'] = '<p>Error: database table prefix is too long ({$a->dbfamily})</p>
+<p>The site administrator must fix this problem. Maximum length for table prefixes in {$a->dbfamily} is {$a->maxlength} characters.</p>';
+
+// Deprecated since Moodle 4.4.
+$string['cannotmarktopic'] = 'Could not mark that section for this course';
+$string['unknownhelp'] = 'Unknown help section {$a}';

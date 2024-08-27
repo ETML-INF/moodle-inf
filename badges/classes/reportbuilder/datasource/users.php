@@ -18,10 +18,13 @@ declare(strict_types=1);
 
 namespace core_badges\reportbuilder\datasource;
 
+use lang_string;
 use core_reportbuilder\datasource;
 use core_reportbuilder\local\entities\{course, user};
 use core_reportbuilder\local\helpers\database;
 use core_badges\reportbuilder\local\entities\{badge, badge_issued};
+use core_cohort\reportbuilder\local\entities\cohort;
+use core_tag\reportbuilder\local\entities\tag;
 
 /**
  * User badges datasource
@@ -48,16 +51,15 @@ class users extends datasource {
         global $CFG;
 
         $userentity = new user();
-
         $useralias = $userentity->get_table_alias('user');
+
         $this->set_main_table('user', $useralias);
+        $this->add_entity($userentity);
 
         $paramguest = database::generate_param_name();
         $this->add_base_condition_sql("{$useralias}.id != :{$paramguest} AND {$useralias}.deleted = 0", [
             $paramguest => $CFG->siteguest,
         ]);
-
-        $this->add_entity($userentity);
 
         // Join the badge issued entity to the user entity.
         $badgeissuedentity = new badge_issued();
@@ -71,6 +73,14 @@ class users extends datasource {
             ->add_joins($badgeissuedentity->get_joins())
             ->add_join("LEFT JOIN {badge} {$badgealias} ON {$badgealias}.id = {$badgeissuedalias}.badgeid"));
 
+        // Join the tag entity.
+        $tagentity = (new tag())
+            ->set_table_alias('tag', $badgeentity->get_table_alias('tag'))
+            ->set_entity_title(new lang_string('badgetags', 'core_badges'));
+        $this->add_entity($tagentity
+            ->add_joins($badgeentity->get_joins())
+            ->add_joins($badgeentity->get_tag_joins()));
+
         // Join the course entity to the badge entity, coalescing courseid with the siteid for site badges.
         $courseentity = new course();
         $coursealias = $courseentity->get_table_alias('course');
@@ -79,8 +89,23 @@ class users extends datasource {
             ->add_join("LEFT JOIN {course} {$coursealias} ON {$coursealias}.id =
                 CASE WHEN {$badgealias}.id IS NULL THEN 0 ELSE COALESCE({$badgealias}.courseid, 1) END"));
 
+        // Join the cohort entity.
+        $cohortentity = new cohort();
+        $cohortalias = $cohortentity->get_table_alias('cohort');
+        $cohortmemberalias = database::generate_alias();
+        $this->add_entity($cohortentity->add_joins([
+            "LEFT JOIN {cohort_members} {$cohortmemberalias} ON {$cohortmemberalias}.userid = {$useralias}.id",
+            "LEFT JOIN {cohort} {$cohortalias} ON {$cohortalias}.id = {$cohortmemberalias}.cohortid",
+        ]));
+
         // Add report elements from each of the entities we added to the report.
-        $this->add_all_from_entities();
+        $this->add_all_from_entity($userentity->get_entity_name());
+        $this->add_all_from_entity($badgeissuedentity->get_entity_name());
+        $this->add_all_from_entity($badgeentity->get_entity_name());
+        $this->add_all_from_entity($tagentity->get_entity_name(), ['name', 'namewithlink'], ['name'], ['name']);
+        $this->add_all_from_entity($courseentity->get_entity_name());
+        $this->add_all_from_entity($cohortentity->get_entity_name(), ['name', 'idnumber', 'description', 'customfield*'],
+            ['cohortselect', 'name', 'idnumber', 'customfield*'], ['cohortselect', 'name', 'idnumber', 'customfield*']);
     }
 
     /**

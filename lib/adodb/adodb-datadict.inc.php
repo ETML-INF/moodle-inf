@@ -202,6 +202,7 @@ class ADODB_DataDict {
 	*/
 	public $blobAllowsDefaultValue;
 
+
 	/**
 	 * @var string String to use to quote identifiers and names
 	 */

@@ -42,7 +42,7 @@ class externallib_test extends externallib_advanced_testcase {
      * @param  int $s2grade Student 2 grade
      * @return array Course and users instances
      */
-    private function load_data(int $s1grade, int $s2grade): array {
+    private function load_data(int $s1grade, int $s2grade, int $s3grade): array {
         global $DB;
 
         $course = $this->getDataGenerator()->create_course(['groupmode' => SEPARATEGROUPS, 'groupmodeforce' => 1]);
@@ -53,6 +53,10 @@ class externallib_test extends externallib_advanced_testcase {
 
         $student2 = $this->getDataGenerator()->create_user();
         $this->getDataGenerator()->enrol_user($student2->id, $course->id, $studentrole->id);
+
+        // Student 3 is in no groups.
+        $student3 = $this->getDataGenerator()->create_user();
+        $this->getDataGenerator()->enrol_user($student3->id, $course->id, $studentrole->id);
 
         $teacherrole = $DB->get_record('role', ['shortname' => 'teacher']);
         $teacher = $this->getDataGenerator()->create_user();
@@ -68,13 +72,14 @@ class externallib_test extends externallib_advanced_testcase {
         groups_add_member($group1->id, $teacher->id);
         groups_add_member($group2->id, $student2->id);
 
-        $assignment = $this->getDataGenerator()->create_module('assign', ['name' => "Test assign", 'course' => $course->id]);
+        $assignment = $this->getDataGenerator()->create_module('assign', ['name' => "Test assign & grade items", 'course' => $course->id]);
         $modcontext = get_coursemodule_from_instance('assign', $assignment->id, $course->id);
         $assignment->cmidnumber = $modcontext->id;
 
         $student1grade = ['userid' => $student1->id, 'rawgrade' => $s1grade, 'idnumber' => 'testidnumber1'];
         $student2grade = ['userid' => $student2->id, 'rawgrade' => $s2grade, 'idnumber' => 'testidnumber2'];
-        $studentgrades = [$student1->id => $student1grade, $student2->id => $student2grade];
+        $student3grade = ['userid' => $student3->id, 'rawgrade' => $s3grade, 'idnumber' => 'testidnumber3'];
+        $studentgrades = [$student1->id => $student1grade, $student2->id => $student2grade, $student3->id => $student3grade];
         assign_grade_item_update($assignment, $studentgrades);
 
         return [
@@ -82,6 +87,7 @@ class externallib_test extends externallib_advanced_testcase {
             $teacher,
             $student1,
             $student2,
+            $student3,
             $assignment
         ];
     }
@@ -89,14 +95,15 @@ class externallib_test extends externallib_advanced_testcase {
     /**
      * Test get_grades_table function case teacher
      */
-    public function test_get_grades_table_teacher() {
+    public function test_get_grades_table_teacher(): void {
 
         $this->resetAfterTest(true);
 
         $s1grade = 80;
         $s2grade = 60;
+        $s3grade = 50;
 
-        list($course, $teacher, $student1, $student2, $assignment) = $this->load_data($s1grade, $s2grade);
+        list($course, $teacher, $student1, $student2, $student3, $assignment) = $this->load_data($s1grade, $s2grade, $s3grade);
 
         // A teacher must see all student grades (in their group only).
         $this->setUser($teacher);
@@ -122,15 +129,16 @@ class externallib_test extends externallib_advanced_testcase {
     /**
      * Test get_grades_table function case student
      */
-    public function test_get_grades_table_student() {
+    public function test_get_grades_table_student(): void {
         global $CFG, $DB;
 
         $this->resetAfterTest(true);
 
         $s1grade = 80;
         $s2grade = 60;
+        $s3grade = 50;
 
-        list($course, $teacher, $student1, $student2, $assignment) = $this->load_data($s1grade, $s2grade);
+        list($course, $teacher, $student1, $student2, $student3, $assignment) = $this->load_data($s1grade, $s2grade, $s3grade);
 
         // A user can see his own grades.
         $this->setUser($student1);
@@ -144,20 +152,37 @@ class externallib_test extends externallib_advanced_testcase {
         $student1returnedgrade = (int) $studentgrade['tables'][0]['tabledata'][2]['grade']['content'];
         $this->assertEquals($s1grade, $student1returnedgrade);
 
+        // A user can see his own even when in no groups.
+        $this->setUser($student3);
+        $studentgrade = user_external::get_grades_table($course->id, $student3->id);
+        $studentgrade = external_api::clean_returnvalue(user_external::get_grades_table_returns(), $studentgrade);
+
+        // No warnings returned.
+        $this->assertTrue(count($studentgrade['warnings']) == 0);
+
+        $this->assertTrue(count($studentgrade['tables']) == 1);
+        $student3returnedgrade = (int) $studentgrade['tables'][0]['tabledata'][2]['grade']['content'];
+        $this->assertEquals($s3grade, $student3returnedgrade);
+
+        // Expect exception when user is not indicated.
+        $this->setUser($student3);
+        $this->expectException(\required_capability_exception::class);
+        user_external::get_grades_table($course->id);
     }
 
     /**
      * Test get_grades_table function case incorrect permissions
      */
-    public function test_get_grades_table_permissions() {
+    public function test_get_grades_table_permissions(): void {
         global $CFG, $DB;
 
         $this->resetAfterTest(true);
 
         $s1grade = 80;
         $s2grade = 60;
+        $s3grade = 50;
 
-        list($course, $teacher, $student1, $student2, $assignment) = $this->load_data($s1grade, $s2grade);
+        list($course, $teacher, $student1, $student2, $student3, $assignment) = $this->load_data($s1grade, $s2grade, $s3grade);
 
         $this->setUser($student2);
 
@@ -172,14 +197,15 @@ class externallib_test extends externallib_advanced_testcase {
     /**
      * Test view_grade_report function
      */
-    public function test_view_grade_report() {
+    public function test_view_grade_report(): void {
         global $USER;
 
         $this->resetAfterTest(true);
 
         $s1grade = 80;
         $s2grade = 60;
-        list($course, $teacher, $student1, $student2, $assignment) = $this->load_data($s1grade, $s2grade);
+        $s3grade = 50;
+        list($course, $teacher, $student1, $student2, $student3, $assignment) = $this->load_data($s1grade, $s2grade, $s3grade);
 
         // Redirect events to the sink, so we can recover them later.
         $sink = $this->redirectEvents();
@@ -220,14 +246,15 @@ class externallib_test extends externallib_advanced_testcase {
     /**
      * Test get_grades_items function case teacher
      */
-    public function test_get_grade_items_teacher() {
+    public function test_get_grade_items_teacher(): void {
 
         $this->resetAfterTest(true);
 
         $s1grade = 80;
         $s2grade = 60;
+        $s3grade = 50;
 
-        list($course, $teacher, $student1, $student2, $assignment) = $this->load_data($s1grade, $s2grade);
+        list($course, $teacher, $student1, $student2, $student3, $assignment) = $this->load_data($s1grade, $s2grade, $s3grade);
 
         // A teacher must see all student grades (in their group only).
         $this->setUser($teacher);
@@ -277,8 +304,10 @@ class externallib_test extends externallib_advanced_testcase {
         $this->assertFalse($studentgrades['usergrades'][0]['gradeitems'][0]['gradeisoverridden']);
         $this->assertEquals('B-', $studentgrades['usergrades'][0]['gradeitems'][0]['lettergradeformatted']);
         $this->assertEquals(1, $studentgrades['usergrades'][0]['gradeitems'][0]['rank']);
-        $this->assertEquals(2, $studentgrades['usergrades'][0]['gradeitems'][0]['numusers']);
-        $this->assertEquals(70, $studentgrades['usergrades'][0]['gradeitems'][0]['averageformatted']);
+        $this->assertEquals(3, $studentgrades['usergrades'][0]['gradeitems'][0]['numusers']);
+        $this->assertEquals(
+            round(array_sum([$s1grade, $s2grade, $s3grade]) / 3, 2),
+            $studentgrades['usergrades'][0]['gradeitems'][0]['averageformatted']);
 
         // Course grades.
         $this->assertEquals('course', $studentgrades['usergrades'][0]['gradeitems'][1]['itemtype']);
@@ -297,8 +326,10 @@ class externallib_test extends externallib_advanced_testcase {
         $this->assertFalse($studentgrades['usergrades'][0]['gradeitems'][1]['gradeisoverridden']);
         $this->assertEquals('B-', $studentgrades['usergrades'][0]['gradeitems'][1]['lettergradeformatted']);
         $this->assertEquals(1, $studentgrades['usergrades'][0]['gradeitems'][1]['rank']);
-        $this->assertEquals(2, $studentgrades['usergrades'][0]['gradeitems'][1]['numusers']);
-        $this->assertEquals(70, $studentgrades['usergrades'][0]['gradeitems'][1]['averageformatted']);
+        $this->assertEquals(3, $studentgrades['usergrades'][0]['gradeitems'][1]['numusers']);
+        $this->assertEquals(
+            round(array_sum([$s1grade, $s2grade, $s3grade]) / 3, 2),
+            $studentgrades['usergrades'][0]['gradeitems'][1]['averageformatted']);
 
         // Now, override and lock a grade.
         $gradegrade = \grade_grade::fetch(['itemid' => $studentgrades['usergrades'][0]['gradeitems'][0]['id'],
@@ -319,14 +350,15 @@ class externallib_test extends externallib_advanced_testcase {
     /**
      * Test get_grades_items function case student
      */
-    public function test_get_grade_items_student() {
+    public function test_get_grade_items_student(): void {
 
         $this->resetAfterTest(true);
 
         $s1grade = 80;
         $s2grade = 60;
+        $s3grade = 50;
 
-        list($course, $teacher, $student1, $student2, $assignment) = $this->load_data($s1grade, $s2grade);
+        list($course, $teacher, $student1, $student2, $student3, $assignment) = $this->load_data($s1grade, $s2grade, $s3grade);
 
         grade_set_setting($course->id, 'report_user_showrank', 1);
         grade_set_setting($course->id, 'report_user_showpercentage', 1);
@@ -374,8 +406,10 @@ class externallib_test extends externallib_advanced_testcase {
         $this->assertNull($studentgrades['usergrades'][0]['gradeitems'][0]['gradeisoverridden']);
         $this->assertEquals('B-', $studentgrades['usergrades'][0]['gradeitems'][0]['lettergradeformatted']);
         $this->assertEquals(1, $studentgrades['usergrades'][0]['gradeitems'][0]['rank']);
-        $this->assertEquals(2, $studentgrades['usergrades'][0]['gradeitems'][0]['numusers']);
-        $this->assertEquals(70, $studentgrades['usergrades'][0]['gradeitems'][0]['averageformatted']);
+        $this->assertEquals(3, $studentgrades['usergrades'][0]['gradeitems'][0]['numusers']);
+        $this->assertEquals(
+            round(array_sum([$s1grade, $s2grade, $s3grade]) / 3, 2),
+            $studentgrades['usergrades'][0]['gradeitems'][0]['averageformatted']);
 
         // Check that the idnumber for assignment grades is equal to the cmid.
         $this->assertEquals((string) $studentgrades['usergrades'][0]['gradeitems'][0]['cmid'],

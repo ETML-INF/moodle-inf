@@ -32,6 +32,7 @@ Feature: Editing a grade item
   Scenario: Being able to change the grade type, scale and maximum grade for a grade category when there are no overridden grades
     Given I click on grade item menu "Cat 1" of type "category" on "setup" page
     And I choose "Edit category" in the open action menu
+    And I click on "Show more..." "link" in the ".modal-dialog" "css_element"
     Then I should not see "This category has associated grade items which have been overridden. Therefore some grades have already been awarded"
     And I expand all fieldsets
     And I set the field "Grade type" to "Scale"
@@ -42,6 +43,7 @@ Feature: Editing a grade item
     And I should not see "You cannot change the type, as grades already exist for this item"
     And I click on grade item menu "Cat 1" of type "category" on "setup" page
     And I choose "Edit category" in the open action menu
+    And I click on "Show more..." "link" in the ".modal-dialog" "css_element"
     And I should not see "This category has associated grade items which have been overridden. Therefore some grades have already been awarded"
     And I expand all fieldsets
     And I set the field "Scale" to "Letter scale"
@@ -56,6 +58,7 @@ Feature: Editing a grade item
     And I navigate to "Setup > Gradebook setup" in the course gradebook
     And I click on grade item menu "Cat 1" of type "category" on "setup" page
     And I choose "Edit category" in the open action menu
+    And I click on "Show more..." "link" in the ".modal-dialog" "css_element"
     And I expand all fieldsets
     Then I should see "This category has associated grade items which have been overridden. Therefore some grades have already been awarded, so the grade type cannot be changed. If you wish to change the maximum grade, you must first choose whether or not to rescale existing grades."
     And "//div[contains(concat(' ', normalize-space(@class), ' '), 'felement') and contains(text(), 'Value')]" "xpath_element" should exist
@@ -63,6 +66,7 @@ Feature: Editing a grade item
   Scenario: Attempting to change a category item's scale when overridden grades already exist
     Given I click on grade item menu "Cat 1" of type "category" on "setup" page
     And I choose "Edit category" in the open action menu
+    And I click on "Show more..." "link" in the ".modal-dialog" "css_element"
     And I expand all fieldsets
     And I set the field "Grade type" to "Scale"
     And I set the field "Scale" to "ABCDEF"
@@ -74,6 +78,7 @@ Feature: Editing a grade item
     And I navigate to "Setup > Gradebook setup" in the course gradebook
     And I click on grade item menu "Cat 1" of type "category" on "setup" page
     And I choose "Edit category" in the open action menu
+    And I click on "Show more..." "link" in the ".modal-dialog" "css_element"
     And I expand all fieldsets
     Then I should see "This category has associated grade items which have been overridden. Therefore some grades have already been awarded, so the grade type and scale cannot be changed."
     And "//div[contains(concat(' ', normalize-space(@class), ' '), 'felement') and contains(text(), 'ABCDEF')]" "xpath_element" should exist
@@ -86,6 +91,7 @@ Feature: Editing a grade item
     And I navigate to "Setup > Gradebook setup" in the course gradebook
     And I click on grade item menu "Cat 1" of type "category" on "setup" page
     And I choose "Edit category" in the open action menu
+    And I click on "Show more..." "link" in the ".modal-dialog" "css_element"
     And I expand all fieldsets
     Then I should see "This category has associated grade items which have been overridden. Therefore some grades have already been awarded, so the grade type cannot be changed. If you wish to change the maximum grade, you must first choose whether or not to rescale existing grades."
     And I should see "Choose" in the "Rescale overridden grades" "field"
@@ -102,6 +108,7 @@ Feature: Editing a grade item
     And I navigate to "Setup > Gradebook setup" in the course gradebook
     And I click on grade item menu "Cat 1" of type "category" on "setup" page
     And I choose "Edit category" in the open action menu
+    And I click on "Show more..." "link" in the ".modal-dialog" "css_element"
     And I expand all fieldsets
     And I set the field "Rescale overridden grades" to "Yes"
     And I set the field "Maximum grade" to "87#50"

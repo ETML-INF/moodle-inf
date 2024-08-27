@@ -41,6 +41,12 @@ class mysqli_native_moodle_database extends moodle_database {
         can_use_readonly as read_slave_can_use_readonly;
     }
 
+    /** @var array $sslmodes */
+    private static $sslmodes = [
+        'require',
+        'verify-full'
+    ];
+
     /** @var mysqli $mysqli */
     protected $mysqli = null;
     /** @var bool is compressed row format supported cache */
@@ -537,6 +543,8 @@ class mysqli_native_moodle_database extends moodle_database {
      * @param mixed $prefix string means moodle db prefix, false used for external databases where prefix not used
      * @param array $dboptions driver specific options
      * @return bool success
+     * @throws moodle_exception
+     * @throws dml_connection_exception if error
      */
     public function raw_connect(string $dbhost, string $dbuser, string $dbpass, string $dbname, $prefix, array $dboptions=null): bool {
         $driverstatus = $this->driver_installed();
@@ -577,16 +585,31 @@ class mysqli_native_moodle_database extends moodle_database {
             $this->mysqli->options(MYSQLI_OPT_CONNECT_TIMEOUT, $this->dboptions['connecttimeout']);
         }
 
+        $flags = 0;
+        if ($this->dboptions['clientcompress'] ?? false) {
+            $flags |= MYSQLI_CLIENT_COMPRESS;
+        }
+        if (isset($this->dboptions['ssl'])) {
+            $sslmode = $this->dboptions['ssl'];
+            if (!in_array($sslmode, self::$sslmodes, true)) {
+                throw new moodle_exception("Invalid 'dboptions''ssl' value '$sslmode'");
+            }
+            $flags |= MYSQLI_CLIENT_SSL;
+            if ($sslmode === 'verify-full') {
+                $flags |= MYSQLI_CLIENT_SSL_VERIFY_SERVER_CERT;
+            }
+        }
+
         $conn = null;
         $dberr = null;
         try {
             // real_connect() is doing things we don't expext.
-            $conn = @$this->mysqli->real_connect($dbhost, $dbuser, $dbpass, $dbname, $dbport, $dbsocket);
+            $conn = @$this->mysqli->real_connect($dbhost, $dbuser, $dbpass, $dbname, $dbport, $dbsocket, $flags);
         } catch (\Exception $e) {
             $dberr = "$e";
         }
         if (!$conn) {
-            $dberr = $dberr ?: $this->mysqli->connect_error;
+            $dberr = $dberr ?: "{$this->mysqli->connect_error} ({$this->mysqli->connect_errno})";
             $this->mysqli = null;
             throw new dml_connection_exception($dberr);
         }
@@ -1904,12 +1927,11 @@ class mysqli_native_moodle_database extends moodle_database {
      * Returns the proper SQL to do CONCAT between the elements passed
      * Can take many parameters
      *
-     * @param string $str,... 1 or more fields/strings to concat
+     * @param string $arr,... 1 or more fields/strings to concat
      *
      * @return string The concat sql
      */
-    public function sql_concat() {
-        $arr = func_get_args();
+    public function sql_concat(...$arr) {
         $s = implode(', ', $arr);
         if ($s === '') {
             return "''";

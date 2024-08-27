@@ -142,9 +142,6 @@ class day_exporter extends exporter {
             'nextperiod' => [
                 'type' => PARAM_INT,
             ],
-            'navigation' => [
-                'type' => PARAM_RAW,
-            ],
             'haslastdayofevent' => [
                 'type' => PARAM_BOOL,
                 'default' => false,
@@ -180,7 +177,6 @@ class day_exporter extends exporter {
             'neweventtimestamp' => $neweventstarttime->getTimestamp(),
             'previousperiod' => $this->get_previous_day_timestamp($daytimestamp),
             'nextperiod' => $this->get_next_day_timestamp($daytimestamp),
-            'navigation' => $this->get_navigation(),
             'viewdaylink' => $this->url->out(false),
         ];
 
@@ -259,18 +255,6 @@ class day_exporter extends exporter {
      */
     protected function get_next_day_timestamp($daytimestamp) {
         return $this->related['type']->get_next_day($daytimestamp);
-    }
-
-    /**
-     * Get the calendar navigation controls.
-     *
-     * @return string The html code to the calendar top navigation.
-     */
-    protected function get_navigation() {
-        return calendar_top_controls('day', [
-            'id' => $this->calendar->courseid,
-            'time' => $this->calendar->time,
-        ]);
     }
 
     /**

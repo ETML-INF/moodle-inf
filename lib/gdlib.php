@@ -43,7 +43,7 @@ defined('MOODLE_INTERNAL') || die();
  * @param int $dst_h the height of the destination rectangle
  * @param int $src_w the width of the source rectangle
  * @param int $src_h the height of the source rectangle
- * @return bool tru on success, false otherwise
+ * @return ?bool tru on success, false otherwise
  */
 function imagecopybicubic($dst_img, $src_img, $dst_x, $dst_y, $src_x, $src_y, $dst_w, $dst_h, $src_w, $src_h) {
     global $CFG;
@@ -359,8 +359,8 @@ function resize_image_from_image($original, $imageinfo, $width, $height, $forcec
     }
 
     if ($ratio < 1) {
-        $targetwidth    = floor($originalwidth * $ratio);
-        $targetheight   = floor($originalheight * $ratio);
+        $targetwidth    = round($originalwidth * $ratio);
+        $targetheight   = round($originalheight * $ratio);
     } else {
         // Do not enlarge the original file if it is smaller than the requested thumbnail size.
         $targetwidth    = $originalwidth;

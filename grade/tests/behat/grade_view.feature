@@ -49,7 +49,9 @@ Feature: We can enter in grades and view reports from the gradebook
   Scenario: Grade a grade item and ensure the results display correctly in the gradebook
     When I navigate to "View > User report" in the course gradebook
     And the "Gradebook navigation menu" select menu should contain "Grader report"
-    And I click on "All users (1)" in the "user" search widget
+    And I set the field "Search users" to "Student"
+    And "View all results (1)" "list_item" should exist
+    And I click on "View all results (1)" "option_role"
     And I log out
     And I log in as "student1"
     And I follow "Grades" in the user menu
@@ -81,10 +83,10 @@ Feature: We can enter in grades and view reports from the gradebook
     And I follow "Grades" in the user menu
     And I click on "Course 1" "link" in the "region-main" "region"
     Then the following should exist in the "user-grade" table:
-      | Grade item | Calculated weight | Grade | Range | Percentage |
-      | Test assignment name 1 | 41.86 % | 80.00 | 0–100 | 80.00 % |
-      | Test assignment name 2 | 58.14 % | 90.00 | 0–100 | 90.00 % |
-      | Course totalWeighted mean of grades. | - | 85.81 | 0–100 | 85.81 % |
+      | Grade item             | Calculated weight | Grade | Range | Percentage |
+      | Test assignment name 1 | 41.86 %           | 80.00 | 0–100 | 80.00 %    |
+      | Test assignment name 2 | 58.14 %           | 90.00 | 0–100 | 90.00 %    |
+      | Course total           | -                 | 85.81 | 0–100 | 85.81 %    |
     And the following should not exist in the "user-grade" table:
       | Grade item | Calculated weight | Percentage |
       | Test assignment name 1 | 0.72% | 0.72% |

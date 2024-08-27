@@ -38,6 +38,9 @@ MDL-77164 - PHPdocs corrections
 MDL-78145 - PHP 8.2 compliance. Added a missing class property that still need to be declared
             to avoid dynamic properties deprecated error warning.
             And also remove the $_elementIdx because it is not needed in Moodle code.
+MDL-78527 - Adding a sixth parameter to allow groups to use attributes.
+MDL-80818 - Freezing all elements with the same name (e.g. radio buttons)
+MDL-80820 - PHPdocs corrections
 
 Pear
 ====

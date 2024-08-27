@@ -16,19 +16,20 @@
 
 namespace core_grades\external;
 
+use core_user_external;
 use core_external\external_api;
-use core_external\external_description;
 use core_external\external_function_parameters;
 use core_external\external_multiple_structure;
 use core_external\external_single_structure;
 use core_external\external_value;
 use core_external\external_warnings;
 use core_external\restricted_context_exception;
-use core_user;
+use user_picture;
 
 defined('MOODLE_INTERNAL') || die;
 
 require_once($CFG->dirroot.'/grade/lib.php');
+require_once($CFG->dirroot .'/user/externallib.php');
 
 /**
  * Get the enrolled users within and map some fields to the returned array of user objects.
@@ -94,17 +95,26 @@ class get_enrolled_users_for_selector extends external_api {
 
         $users = [];
 
-        while ($userdata = $gui->next_user()) {
-            $guiuser = $userdata->user;
-            $user = new \stdClass();
-            $user->fullname = fullname($guiuser);
-            $user->id = $guiuser->id;
-            $userpicture = new \user_picture($guiuser);
-            $userpicture->size = 1;
-            $user->profileimage = $userpicture->get_url($PAGE)->out(false);
-            $user->email = $guiuser->email;
+        $userfieldsapi = \core_user\fields::for_identity($coursecontext, false)->with_userpic();
+        $extrauserfields = $userfieldsapi->get_required_fields([\core_user\fields::PURPOSE_IDENTITY]);
 
-            $users[] = $user;
+        while ($userdata = $gui->next_user()) {
+            $userforselector = new \stdClass();
+            $userforselector->id = $userdata->user->id;
+            $userforselector->fullname = fullname($userdata->user);
+            foreach (\core_user\fields::get_name_fields() as $field) {
+                $userforselector->$field = $userdata->user->$field ?? null;
+            }
+            $userpicture = new user_picture($userdata->user);
+            $userpicture->size = 1;
+            $userforselector->profileimageurl = $userpicture->get_url($PAGE)->out(false);
+            $userpicture->size = 0; // Size f2.
+            $userforselector->profileimageurlsmall = $userpicture->get_url($PAGE)->out(false);
+            foreach ($extrauserfields as $field) {
+                $userforselector->$field = $userdata->user->$field ?? null;
+            }
+
+            $users[] = $userforselector;
         }
         $gui->close();
 
@@ -121,30 +131,8 @@ class get_enrolled_users_for_selector extends external_api {
      */
     public static function execute_returns(): external_single_structure {
         return new external_single_structure([
-            'users' => new external_multiple_structure(self::user_description()),
+            'users' => new external_multiple_structure(core_user_external::user_description()),
             'warnings' => new external_warnings(),
         ]);
-    }
-
-    /**
-     * Create user return value description.
-     *
-     * @return external_description
-     */
-    public static function user_description(): external_description {
-        $userfields = [
-            'id'    => new external_value(core_user::get_property_type('id'), 'ID of the user'),
-            'profileimage' => new external_value(
-                PARAM_URL,
-                'The location of the users larger image',
-                VALUE_OPTIONAL
-            ),
-            'fullname' => new external_value(PARAM_TEXT, 'The full name of the user', VALUE_OPTIONAL),
-            'email' => new external_value(
-                core_user::get_property_type('email'),
-                'An email address - allow email as root@localhost',
-                VALUE_OPTIONAL)
-        ];
-        return new external_single_structure($userfields);
     }
 }

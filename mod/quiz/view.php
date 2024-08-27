@@ -24,6 +24,7 @@
  */
 
 use mod_quiz\access_manager;
+use mod_quiz\output\list_of_attempts;
 use mod_quiz\output\renderer;
 use mod_quiz\output\view_page;
 use mod_quiz\quiz_attempt;
@@ -95,10 +96,20 @@ if ($unfinishedattempt = quiz_get_user_attempt_unfinished($quiz->id, $USER->id))
 }
 $numattempts = count($attempts);
 
+$gradeitemmarks = $quizobj->get_grade_calculator()->compute_grade_item_totals_for_attempts(
+    array_column($attempts, 'uniqueid'));
+
 $viewobj->attempts = $attempts;
 $viewobj->attemptobjs = [];
 foreach ($attempts as $attempt) {
-    $viewobj->attemptobjs[] = new quiz_attempt($attempt, $quiz, $cm, $course, false);
+    $attemptobj = new quiz_attempt($attempt, $quiz, $cm, $course, false);
+    $attemptobj->set_grade_item_totals($gradeitemmarks[$attempt->uniqueid]);
+    $viewobj->attemptobjs[] = $attemptobj;
+
+}
+$viewobj->attemptslist = new list_of_attempts($timenow);
+foreach (array_reverse($viewobj->attemptobjs) as $attemptobj) {
+    $viewobj->attemptslist->add_attempt($attemptobj);
 }
 
 // Work out the final grade, checking whether it was overridden in the gradebook.
@@ -115,21 +126,33 @@ if (!$canpreview) {
 $mygradeoverridden = false;
 $gradebookfeedback = '';
 
-$item = null;
+$gradeitem = grade_item::fetch([
+    'itemtype' => 'mod',
+    'itemmodule' => 'quiz',
+    'iteminstance' => $quiz->id,
+    'itemnumber' => 0,
+    'courseid' => $course->id,
+]);
 
-$gradinginfo = grade_get_grades($course->id, 'mod', 'quiz', $quiz->id, $USER->id);
-if (!empty($gradinginfo->items)) {
-    $item = $gradinginfo->items[0];
-    if (isset($item->grades[$USER->id])) {
-        $grade = $item->grades[$USER->id];
-
+if ($gradeitem) {
+    if ($gradeitem->refresh_grades($USER->id)) {
+        $grade = $gradeitem->get_grade($USER->id, false);
         if ($grade->overridden) {
-            $mygrade = $grade->grade + 0; // Convert to number.
+            if ($gradeitem->needsupdate) {
+                // It is Error, but let's be consistent with the old code.
+                $mygrade = 0;
+            } else {
+                $mygrade = $grade->finalgrade;
+            }
             $mygradeoverridden = true;
         }
-        if (!empty($grade->str_feedback)) {
-            $gradebookfeedback = $grade->str_feedback;
+
+        if (!empty($grade->feedback)) {
+            $gradebookfeedback = $grade->feedback;
         }
+    } else {
+        // It is Error, but let's be consistent with the old code.
+        $mygrade = 0;
     }
 }
 
@@ -186,9 +209,9 @@ if ($quiz->attempts != 1) {
 }
 
 // Inform user of the grade to pass if non-zero.
-if ($item && grade_floats_different($item->gradepass, 0)) {
+if ($gradeitem && grade_floats_different($gradeitem->gradepass, 0)) {
     $a = new stdClass();
-    $a->grade = quiz_format_grade($quiz, $item->gradepass);
+    $a->grade = quiz_format_grade($quiz, $gradeitem->gradepass);
     $a->maxgrade = quiz_format_grade($quiz, $quiz->grade);
     $viewobj->infomessages[] = get_string('gradetopassoutof', 'quiz', $a);
 }

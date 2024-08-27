@@ -57,6 +57,8 @@
 
 .path-grade-report-grader .grade_icons .icon {
     margin-right: 1rem;
+    font-size: 14px;
+    width: 24px;
 }
 
 .path-grade-report-grader .grade_icons .icon:last-child {
@@ -90,8 +92,8 @@
 }
 
 .path-grade-report-grader .heading .gradeitemheader {
-    text-indent: -1.5rem;
-    padding-left: 1.5rem;
+    text-indent: -2rem;
+    padding-left: 2rem;
     padding-top: 6px;
 }
 
@@ -158,9 +160,8 @@
 }
 
 .path-grade-report-grader .gradeparent .sorticon {
-    margin-left: 5px;
     vertical-align: middle;
-    margin-right: 1px;
+    margin: 0;
 }
 
 .path-grade-report-grader .gradeparent td.grade_type_value,
@@ -212,13 +213,13 @@
     text-align: center;
 }
 
-.path-grade-report-grader .action-menu {
+.path-grade-report-grader .gradeparent table .action-menu {
     display: inline-block;
     margin-right: -0.5rem;
     padding-left: 0.5rem;
 }
 
-.path-grade-report-grader .heading .action-menu {
+.path-grade-report-grader .gradeparent table .heading .action-menu {
     padding-left: 0;
 }
 
@@ -267,7 +268,7 @@
 }
 
 .collapsecolumndropdown.show {
-    width: 275px;
+    width: 300px;
     max-height: 300px;
 }
 

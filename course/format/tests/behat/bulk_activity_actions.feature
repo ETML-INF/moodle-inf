@@ -6,10 +6,11 @@ Feature: Bulk course activity actions.
 
   Background:
     Given the following "course" exists:
-      | fullname    | Course 1 |
-      | shortname   | C1       |
-      | category    | 0        |
-      | numsections | 4        |
+      | fullname     | Course 1 |
+      | shortname    | C1       |
+      | category     | 0        |
+      | numsections  | 4        |
+      | initsections | 1        |
     And the following "activities" exist:
       | activity | name              | intro                       | course | idnumber | section |
       | assign   | Activity sample 1 | Test assignment description | C1     | sample1  | 1       |
@@ -26,7 +27,7 @@ Feature: Bulk course activity actions.
       | allowstealth | 1 |
     And I am on the "C1" "Course" page logged in as "teacher1"
     And I turn editing mode on
-    And I click on "Bulk edit" "button"
+    And I click on "Bulk actions" "button"
     And I should see "0 selected" in the "sticky-footer" "region"
 
   Scenario: Bulk hiding activities
@@ -52,7 +53,7 @@ Feature: Bulk course activity actions.
       | assign   | Activity sample 5 | Test assignment description | C1     | sample5  | 1       | 0       |
       | assign   | Activity sample 6 | Test assignment description | C1     | sample6  | 2       | 0       |
     And I reload the page
-    And I click on "Bulk edit" "button"
+    And I click on "Bulk actions" "button"
     And I should not see "Hidden from students" in the "Activity sample 4" "activity"
     And I should see "Hidden from students" in the "Activity sample 5" "activity"
     And I should see "Hidden from students" in the "Activity sample 6" "activity"
@@ -76,7 +77,7 @@ Feature: Bulk course activity actions.
     When the following config values are set as admin:
       | allowstealth | 0 |
     And I reload the page
-    And I click on "Bulk edit" "button"
+    And I click on "Bulk actions" "button"
     Then I click on "Select activity Activity sample 1" "checkbox"
     And I should see "1 selected" in the "sticky-footer" "region"
     And I click on "Activity availability" "button" in the "sticky-footer" "region"
@@ -103,69 +104,69 @@ Feature: Bulk course activity actions.
     And I click on "Select activity Activity sample 3" "checkbox"
     And I should see "2 selected" in the "sticky-footer" "region"
     When I click on "Duplicate activities" "button" in the "sticky-footer" "region"
-    Then I should see "Activity sample 1" in the "Topic 1" "section"
-    And I should see "Activity sample 1 (copy)" in the "Topic 1" "section"
+    Then I should see "Activity sample 1" in the "Section 1" "section"
+    And I should see "Activity sample 1 (copy)" in the "Section 1" "section"
     And "Activity sample 1 (copy)" "activity" should appear after "Activity sample 1" "activity"
-    And I should see "Activity sample 3" in the "Topic 2" "section"
-    And I should see "Activity sample 3 (copy)" in the "Topic 2" "section"
+    And I should see "Activity sample 3" in the "Section 2" "section"
+    And I should see "Activity sample 3 (copy)" in the "Section 2" "section"
     And "Activity sample 3 (copy)" "activity" should appear after "Activity sample 3" "activity"
 
   Scenario: Bulk delete activities
-    Given I should see "Activity sample 1" in the "Topic 1" "section"
-    And I should see "Activity sample 2" in the "Topic 1" "section"
-    And I should see "Activity sample 3" in the "Topic 2" "section"
-    And I should see "Activity sample 4" in the "Topic 2" "section"
+    Given I should see "Activity sample 1" in the "Section 1" "section"
+    And I should see "Activity sample 2" in the "Section 1" "section"
+    And I should see "Activity sample 3" in the "Section 2" "section"
+    And I should see "Activity sample 4" in the "Section 2" "section"
     And I click on "Select activity Activity sample 1" "checkbox"
     And I click on "Select activity Activity sample 3" "checkbox"
     And I should see "2 selected" in the "sticky-footer" "region"
     When I click on "Delete activities" "button" in the "sticky-footer" "region"
     And I click on "Delete" "button" in the "Delete selected activities?" "dialogue"
-    Then I should not see "Activity sample 1" in the "Topic 1" "section"
-    And I should see "Activity sample 2" in the "Topic 1" "section"
-    And I should not see "Activity sample 3" in the "Topic 2" "section"
-    And I should see "Activity sample 4" in the "Topic 2" "section"
+    Then I should not see "Activity sample 1" in the "Section 1" "section"
+    And I should see "Activity sample 2" in the "Section 1" "section"
+    And I should not see "Activity sample 3" in the "Section 2" "section"
+    And I should see "Activity sample 4" in the "Section 2" "section"
     And I should see "0 selected" in the "sticky-footer" "region"
 
   Scenario: Bulk move activities after a specific activity
-    Given I should see "Activity sample 1" in the "Topic 1" "section"
-    And I should see "Activity sample 2" in the "Topic 1" "section"
-    And I should see "Activity sample 3" in the "Topic 2" "section"
-    And I should see "Activity sample 4" in the "Topic 2" "section"
+    Given I should see "Activity sample 1" in the "Section 1" "section"
+    And I should see "Activity sample 2" in the "Section 1" "section"
+    And I should see "Activity sample 3" in the "Section 2" "section"
+    And I should see "Activity sample 4" in the "Section 2" "section"
     And I click on "Select activity Activity sample 1" "checkbox"
     And I click on "Select activity Activity sample 3" "checkbox"
     And I should see "2 selected" in the "sticky-footer" "region"
     When I click on "Move activities" "button" in the "sticky-footer" "region"
     And I click on "Activity sample 2" "link" in the "Move selected activities" "dialogue"
     And I should see "0 selected" in the "sticky-footer" "region"
-    # Check activities are moved to the right topics.
-    Then I should see "Activity sample 1" in the "Topic 1" "section"
-    And I should see "Activity sample 2" in the "Topic 1" "section"
-    And I should see "Activity sample 3" in the "Topic 1" "section"
-    And I should not see "Activity sample 3" in the "Topic 2" "section"
-    And I should see "Activity sample 4" in the "Topic 2" "section"
+    # Check activities are moved to the right sections.
+    Then I should see "Activity sample 1" in the "Section 1" "section"
+    And I should see "Activity sample 2" in the "Section 1" "section"
+    And I should see "Activity sample 3" in the "Section 1" "section"
+    And I should not see "Activity sample 3" in the "Section 2" "section"
+    And I should see "Activity sample 4" in the "Section 2" "section"
     # Check new activities order.
     And "Activity sample 1" "activity" should appear after "Activity sample 2" "activity"
     And "Activity sample 3" "activity" should appear after "Activity sample 1" "activity"
     And "Activity sample 4" "activity" should appear after "Activity sample 3" "activity"
 
   Scenario: Bulk move activities after a specific section header
-    Given I should see "Activity sample 1" in the "Topic 1" "section"
-    And I should see "Activity sample 2" in the "Topic 1" "section"
-    And I should see "Activity sample 3" in the "Topic 2" "section"
-    And I should see "Activity sample 4" in the "Topic 2" "section"
+    Given I should see "Activity sample 1" in the "Section 1" "section"
+    And I should see "Activity sample 2" in the "Section 1" "section"
+    And I should see "Activity sample 3" in the "Section 2" "section"
+    And I should see "Activity sample 4" in the "Section 2" "section"
     And I click on "Select activity Activity sample 1" "checkbox"
     And I click on "Select activity Activity sample 3" "checkbox"
     And I should see "2 selected" in the "sticky-footer" "region"
     When I click on "Move activities" "button" in the "sticky-footer" "region"
-    And I click on "Topic 3" "link" in the "Move selected activities" "dialogue"
+    And I click on "Section 3" "link" in the "Move selected activities" "dialogue"
     And I should see "0 selected" in the "sticky-footer" "region"
-    # Check activities are moved to the right topics.
-    Then I should see "Activity sample 1" in the "Topic 3" "section"
-    Then I should not see "Activity sample 1" in the "Topic 1" "section"
-    And I should see "Activity sample 2" in the "Topic 1" "section"
-    And I should see "Activity sample 3" in the "Topic 3" "section"
-    And I should not see "Activity sample 3" in the "Topic 2" "section"
-    And I should see "Activity sample 4" in the "Topic 2" "section"
+    # Check activities are moved to the right sections.
+    Then I should see "Activity sample 1" in the "Section 3" "section"
+    Then I should not see "Activity sample 1" in the "Section 1" "section"
+    And I should see "Activity sample 2" in the "Section 1" "section"
+    And I should see "Activity sample 3" in the "Section 3" "section"
+    And I should not see "Activity sample 3" in the "Section 2" "section"
+    And I should see "Activity sample 4" in the "Section 2" "section"
     # Check new activities order.
     And "Activity sample 4" "activity" should appear after "Activity sample 2" "activity"
     And "Activity sample 1" "activity" should appear after "Activity sample 4" "activity"

@@ -127,6 +127,12 @@ $functions = array(
         'capabilities'  => 'moodle/badges:viewotherbadges',
         'services'      => array(MOODLE_OFFICIAL_MOBILE_SERVICE),
     ),
+    'core_badges_get_user_badge_by_hash' => [
+        'classname'     => 'core_badges\external\get_user_badge_by_hash',
+        'description'   => 'Returns the badge awarded to a user by hash.',
+        'type'          => 'read',
+        'services'      => [MOODLE_OFFICIAL_MOBILE_SERVICE],
+    ],
     'core_blog_get_entries' => array(
         'classname'   => 'core_blog\external',
         'methodname'  => 'get_entries',
@@ -145,6 +151,36 @@ $functions = array(
         'ajax'          => true,
         'loginrequired' => false,
     ),
+    'core_blog_get_access_information' => [
+        'classname' => '\core_blog\external\get_access_information',
+        'description' => 'Retrieves permission information for the current user.',
+        'type' => 'read',
+        'services' => [MOODLE_OFFICIAL_MOBILE_SERVICE],
+    ],
+    'core_blog_add_entry' => [
+        'classname' => '\core_blog\external\add_entry',
+        'description' => 'Creates a new blog post entry.',
+        'type' => 'write',
+        'services' => [MOODLE_OFFICIAL_MOBILE_SERVICE],
+    ],
+    'core_blog_delete_entry' => [
+        'classname' => '\core_blog\external\delete_entry',
+        'description' => 'Deletes a blog post entry.',
+        'type' => 'write',
+        'services' => [MOODLE_OFFICIAL_MOBILE_SERVICE],
+    ],
+    'core_blog_prepare_entry_for_edition' => [
+        'classname' => '\core_blog\external\prepare_entry_for_edition',
+        'description' => 'Prepare a draft area for editing a blog entry..',
+        'type' => 'write',
+        'services' => [MOODLE_OFFICIAL_MOBILE_SERVICE],
+    ],
+    'core_blog_update_entry' => [
+        'classname' => '\core_blog\external\update_entry',
+        'description' => 'Updates a blog entry.',
+        'type' => 'write',
+        'services' => [MOODLE_OFFICIAL_MOBILE_SERVICE],
+    ],
     'core_calendar_get_calendar_monthly_view' => array(
         'classname' => 'core_calendar_external',
         'methodname' => 'get_calendar_monthly_view',
@@ -222,6 +258,7 @@ $functions = array(
         'capabilities' => 'moodle/calendar:manageentries, moodle/calendar:manageownentries, moodle/calendar:managegroupentries',
         'ajax' => true,
         'services' => array(MOODLE_OFFICIAL_MOBILE_SERVICE),
+        'readonlysession' => true,
     ),
     'core_calendar_get_action_events_by_course' => array(
         'classname' => 'core_calendar_external',
@@ -298,6 +335,13 @@ $functions = array(
         'description' => 'Delete the calendar subscription',
         'type' => 'write',
         'ajax' => true
+    ],
+    'core_check_get_result_admintree' => [
+        'classname' => 'core\check\external\get_result_admintree',
+        'description' => 'Executes a check stored in the admin tree and returns the result',
+        'type' => 'read',
+        'ajax' => true,
+        'readonlysession' => true,
     ],
     'core_cohort_add_cohort_members' => array(
         'classname' => 'core_cohort_external',
@@ -663,6 +707,7 @@ $functions = array(
         'type' => 'read',
         'ajax' => true,
         'services' => array(MOODLE_OFFICIAL_MOBILE_SERVICE),
+        'readonlysession' => true,
     ),
     'core_course_get_recent_courses' => array(
         'classname' => 'core_course_external',
@@ -949,14 +994,6 @@ $functions = array(
         'ajax' => true,
         'services' => [MOODLE_OFFICIAL_MOBILE_SERVICE],
     ],
-    'core_grades_create_gradecategory' => array (
-        'classname' => 'core_grades_external',
-        'methodname' => 'create_gradecategory',
-        'description' => '** DEPRECATED ** Please do not call this function any more. Use core_grades_create_gradecategories.
-                                     Create a grade category inside a course gradebook.',
-        'type' => 'write',
-        'capabilities' => 'moodle/grade:manage',
-    ),
     'core_grades_create_gradecategories' => array (
         'classname' => 'core_grades\external\create_gradecategories',
         'description' => 'Create grade categories inside a course gradebook.',
@@ -980,17 +1017,19 @@ $functions = array(
         'services' => [MOODLE_OFFICIAL_MOBILE_SERVICE],
     ),
     'core_grades_get_groups_for_search_widget' => [
-        'classname' => 'core_grades\external\get_groups_for_selector',
+        'classname' => 'core_group\external\get_groups_for_selector',
         'description' => '** DEPRECATED ** Please do not call this function any more. ' .
-            'Use core_grades_get_groups_for_selector instead. ' .
+            'Use core_group_get_groups_for_selector instead. ' .
             'Get the group/(s) for a course',
         'type' => 'read',
         'ajax' => true,
         'services' => [MOODLE_OFFICIAL_MOBILE_SERVICE],
     ],
     'core_grades_get_groups_for_selector' => [
-        'classname' => 'core_grades\external\get_groups_for_selector',
-        'description' => 'Get the group/(s) for a course',
+        'classname' => 'core_group\external\get_groups_for_selector',
+        'description' => '** DEPRECATED ** Please do not call this function any more. ' .
+            'Use core_group_get_groups_for_selector instead. ' .
+            'Get the group/(s) for a course',
         'type' => 'read',
         'ajax' => true,
         'services' => [MOODLE_OFFICIAL_MOBILE_SERVICE],
@@ -1007,6 +1046,12 @@ $functions = array(
         'type' => 'read',
         'ajax' => true,
         'services' => [MOODLE_OFFICIAL_MOBILE_SERVICE],
+    ],
+    'core_grades_get_grade_tree' => [
+        'classname' => 'core_grades\external\get_grade_tree',
+        'description' => 'Get the grade tree structure for a course',
+        'type' => 'read',
+        'ajax' => true,
     ],
     'core_grades_get_gradable_users' => [
         'classname' => 'core_grades\external\get_gradable_users',
@@ -1152,6 +1197,13 @@ $functions = array(
         'type' => 'read',
         'capabilities' => 'moodle/course:managegroups'
     ),
+    'core_group_get_groups_for_selector' => [
+        'classname' => 'core_group\external\get_groups_for_selector',
+        'description' => 'Get the group/(s) for a course',
+        'type' => 'read',
+        'ajax' => true,
+        'services' => [MOODLE_OFFICIAL_MOBILE_SERVICE],
+    ],
     'core_group_unassign_grouping' => array(
         'classname' => 'core_group_external',
         'methodname' => 'unassign_grouping',
@@ -1471,6 +1523,7 @@ $functions = array(
         'capabilities' => 'moodle/site:sendmessage',
         'ajax' => true,
         'services' => array(MOODLE_OFFICIAL_MOBILE_SERVICE),
+        'readonlysession' => true,
     ),
     'core_message_send_messages_to_conversation' => array(
         'classname' => 'core_message_external',
@@ -1551,6 +1604,13 @@ $functions = array(
         'classname'     => '\core_message\external\get_unread_notification_count',
         'description'   => 'Get number of unread notifications.',
         'type'          => 'read',
+        'services'      => [MOODLE_OFFICIAL_MOBILE_SERVICE],
+    ],
+    'core_my_view_page' => [
+        'classname'     => '\core_my\external\view_page',
+        'methodname'    => 'execute',
+        'description'   => 'Trigger the My or Dashboard viewed event.',
+        'type'          => 'write',
         'services'      => [MOODLE_OFFICIAL_MOBILE_SERVICE],
     ],
     'core_notes_create_notes' => array(
@@ -1646,13 +1706,6 @@ $functions = array(
         'capabilities'  => 'moodle/question:flag',
         'services'      => array(MOODLE_OFFICIAL_MOBILE_SERVICE),
     ),
-    'core_question_submit_tags_form' => array(
-        'classname'     => 'core_question_external',
-        'methodname'    => 'submit_tags_form',
-        'description'   => 'Update the question tags.',
-        'type'          => 'write',
-        'ajax' => true,
-    ),
     'core_question_get_random_question_summaries' => array(
         'classname' => 'core_question_external',
         'methodname' => 'get_random_question_summaries',
@@ -1699,6 +1752,34 @@ $functions = array(
         'type' => 'read',
         'ajax' => true
     ),
+    'core_search_get_results' => [
+        'classname' => '\core_search\external\get_results',
+        'description' => 'Get search results.',
+        'type' => 'read',
+        'capabilities' => 'moodle/search:query',
+        'services' => [MOODLE_OFFICIAL_MOBILE_SERVICE],
+    ],
+    'core_search_get_search_areas_list' => [
+        'classname' => '\core_search\external\get_search_areas_list',
+        'description' => 'Get search areas.',
+        'type' => 'read',
+        'capabilities' => 'moodle/search:query',
+        'services' => [MOODLE_OFFICIAL_MOBILE_SERVICE],
+    ],
+    'core_search_view_results' => [
+        'classname' => '\core_search\external\view_results',
+        'description' => 'Trigger view search results event.',
+        'type' => 'write',
+        'capabilities' => 'moodle/search:query',
+        'services' => [MOODLE_OFFICIAL_MOBILE_SERVICE],
+    ],
+    'core_search_get_top_results' => [
+        'classname' => '\core_search\external\get_top_results',
+        'description' => 'Get top search results.',
+        'type' => 'read',
+        'capabilities' => 'moodle/search:query',
+        'services' => [MOODLE_OFFICIAL_MOBILE_SERVICE],
+    ],
     'core_tag_get_tagindex' => array(
         'classname' => 'core_tag_external',
         'methodname' => 'get_tagindex',
@@ -1905,6 +1986,7 @@ $functions = array(
         'type' => 'write',
         'capabilities' => 'moodle/site:config',
         'ajax' => true,
+        'loginrequired' => false,
         'services' => array(MOODLE_OFFICIAL_MOBILE_SERVICE),
     ),
     'core_user_agree_site_policy' => array(
@@ -2728,6 +2810,13 @@ $functions = array(
         'type'        => 'read',
         'services'    => array(MOODLE_OFFICIAL_MOBILE_SERVICE),
     ),
+    'core_filters_get_all_states' => [
+        'classname'   => 'core_filters\external\get_all_states',
+        'description' => 'Retrieve all the filters and their states (including overridden ones in any context).',
+        'type'        => 'read',
+        'services'    => [MOODLE_OFFICIAL_MOBILE_SERVICE],
+    ],
+
     'core_customfield_delete_field' => array(
         'classname'   => 'core_customfield_external',
         'methodname'  => 'delete_field',
@@ -2836,6 +2925,13 @@ $functions = array(
         'capabilities' => '',
         'services' => [MOODLE_OFFICIAL_MOBILE_SERVICE],
     ],
+    'core_xapi_delete_states' => [
+        'classname' => 'core_xapi\external\delete_states',
+        'description' => 'Delete all xAPI state data from an activityId.',
+        'type' => 'write',
+        'ajax' => true,
+        'services' => [MOODLE_OFFICIAL_MOBILE_SERVICE],
+    ],
     'core_contentbank_delete_content' => [
         'classname'     => 'core_contentbank\external\delete_content',
         'classpath'     => '',
@@ -2851,6 +2947,14 @@ $functions = array(
         'type'          => 'write',
         'ajax'          => true,
         'capabilities'  => 'moodle/contentbank:manageowncontent',
+    ],
+    'core_contentbank_copy_content' => [
+        'classname'     => 'core_contentbank\external\copy_content',
+        'classpath'     => '',
+        'description'   => 'Copy a content in the content bank.',
+        'type'          => 'write',
+        'ajax'          => 'true',
+        'capabilities'  => 'moodle/contentbank:copycontent, moodle/contentbank:copyanycontent',
     ],
     'core_contentbank_set_content_visibility' => [
         'classname'     => 'core_contentbank\external\set_content_visibility',
@@ -2920,6 +3024,18 @@ $functions = array(
     'core_reportbuilder_retrieve_report' => [
         'classname'   => 'core_reportbuilder\external\reports\retrieve',
         'description' => 'Retrieve custom report content',
+        'type'        => 'read',
+        'services'    => [MOODLE_OFFICIAL_MOBILE_SERVICE],
+    ],
+    'core_reportbuilder_retrieve_system_report' => [
+        'classname'   => 'core_reportbuilder\external\systemreports\retrieve',
+        'description' => 'Retrieve system report content',
+        'type'        => 'read',
+        'services'    => [MOODLE_OFFICIAL_MOBILE_SERVICE],
+    ],
+    'core_reportbuilder_can_view_system_report' => [
+        'classname'   => 'core_reportbuilder\external\systemreports\can_view',
+        'description' => 'Determine access to a system report',
         'type'        => 'read',
         'services'    => [MOODLE_OFFICIAL_MOBILE_SERVICE],
     ],
@@ -3065,6 +3181,18 @@ $functions = array(
         'classname'   => 'core\external\moodlenet_auth_check',
         'description' => 'Check a user has authorized for a given MoodleNet site',
         'type'        => 'write',
+        'ajax'        => true,
+    ],
+    'core_moodlenet_get_shared_course_info' => [
+        'classname'   => 'core\external\moodlenet_get_shared_course_info',
+        'description' => 'Get information about an course being shared',
+        'type'        => 'read',
+        'ajax'        => true,
+    ],
+    'core_moodlenet_send_course' => [
+        'classname'   => 'core\external\moodlenet_send_course',
+        'description' => 'Send course to MoodleNet',
+        'type'        => 'read',
         'ajax'        => true,
     ],
 );

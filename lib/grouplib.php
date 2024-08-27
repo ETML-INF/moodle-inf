@@ -145,7 +145,7 @@ function groups_get_group_by_name($courseid, $name) {
  * @category group
  * @param int $courseid The id of the course
  * @param string $idnumber idnumber of group
- * @return group object
+ * @return stdClass|false group object
  */
 function groups_get_group_by_idnumber($courseid, $idnumber) {
     if (empty($idnumber)) {
@@ -186,7 +186,7 @@ function groups_get_grouping_by_name($courseid, $name) {
  * @category group
  * @param int $courseid The id of the course
  * @param string $idnumber idnumber of the group
- * @return grouping object
+ * @return stdClass|false grouping object
  */
 function groups_get_grouping_by_idnumber($courseid, $idnumber) {
     if (empty($idnumber)) {
@@ -211,9 +211,14 @@ function groups_get_grouping_by_idnumber($courseid, $idnumber) {
  * @return bool|stdClass group object or false if not found
  * @throws dml_exception
  */
-function groups_get_group($groupid, $fields='*', $strictness=IGNORE_MISSING) {
+function groups_get_group($groupid, $fields = '*', $strictness = IGNORE_MISSING, $withcustomfields = false) {
     global $DB;
-    return $DB->get_record('groups', array('id'=>$groupid), $fields, $strictness);
+    $group = $DB->get_record('groups', ['id' => $groupid], $fields, $strictness);
+    if ($withcustomfields) {
+        $customfieldsdata = get_group_custom_fields_data([$groupid]);
+        $group->customfields = $customfieldsdata[$groupid] ?? [];
+    }
+    return $group;
 }
 
 /**
@@ -225,9 +230,14 @@ function groups_get_group($groupid, $fields='*', $strictness=IGNORE_MISSING) {
  * @param int $strictness (IGNORE_MISSING - default)
  * @return stdClass group object
  */
-function groups_get_grouping($groupingid, $fields='*', $strictness=IGNORE_MISSING) {
+function groups_get_grouping($groupingid, $fields='*', $strictness=IGNORE_MISSING, $withcustomfields = false) {
     global $DB;
-    return $DB->get_record('groupings', array('id'=>$groupingid), $fields, $strictness);
+    $grouping = $DB->get_record('groupings', ['id' => $groupingid], $fields, $strictness);
+    if ($withcustomfields) {
+        $customfieldsdata = get_grouping_custom_fields_data([$groupingid]);
+        $grouping->customfields = $customfieldsdata[$groupingid] ?? [];
+    }
+    return $grouping;
 }
 
 /**
@@ -447,9 +457,12 @@ function groups_get_my_groups() {
  * @category group
  * @param int $courseid
  * @param int $userid $USER if not specified
+ * @param bool $includehidden Include groups with GROUP_VISIBILITY_NONE that the user is a member of, but is not allowed to see
+ *    themselves. Use this parameter with care - it is the responsibility of the calling code to ensure these groups are not exposed
+ *    to the user, as this could have privacy implications.
  * @return array Array[groupingid][groupid] including grouping id 0 which means all groups
  */
-function groups_get_user_groups($courseid, $userid=0) {
+function groups_get_user_groups(int $courseid, int $userid = 0, bool $includehidden = false): array {
     global $USER, $DB;
 
     if (empty($courseid)) {
@@ -461,7 +474,7 @@ function groups_get_user_groups($courseid, $userid=0) {
     }
 
     $usergroups = false;
-    $viewhidden = has_capability('moodle/course:viewhiddengroups', context_course::instance($courseid));
+    $viewhidden = $includehidden || has_capability('moodle/course:viewhiddengroups', context_course::instance($courseid));
     $viewall = \core_group\visibility::can_view_all_groups($courseid);
 
     $cache = cache::make('core', 'user_group_groupings');
@@ -473,7 +486,7 @@ function groups_get_user_groups($courseid, $userid=0) {
 
     if ($usergroups === false) {
 
-        $sql = "SELECT g.id, g.courseid, gg.groupingid
+        $sql = "SELECT g.id, g.courseid, gg.groupingid, g.visibility
                   FROM {groups} g
                   JOIN {groups_members} gm ON gm.groupid = g.id
              LEFT JOIN {groupings_groups} gg ON gg.groupid = g.id

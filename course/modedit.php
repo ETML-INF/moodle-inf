@@ -37,11 +37,22 @@ $return = optional_param('return', 0, PARAM_BOOL);    //return to course/view.ph
 $type   = optional_param('type', '', PARAM_ALPHANUM); //TODO: hopefully will be removed in 2.0
 $sectionreturn = optional_param('sr', null, PARAM_INT);
 $beforemod = optional_param('beforemod', 0, PARAM_INT);
+$showonly = optional_param('showonly', '', PARAM_TAGLIST); // Settings group to show expanded and hide the rest.
+
+// Force it to be null if it's not a valid section number.
+if ($sectionreturn < 0) {
+    $sectionreturn = null;
+}
 
 $url = new moodle_url('/course/modedit.php');
-$url->param('sr', $sectionreturn);
+if (!is_null($sectionreturn)) {
+    $url->param('sr', $sectionreturn);
+}
 if (!empty($return)) {
     $url->param('return', $return);
+}
+if (!empty($showonly)) {
+    $url->param('showonly', $showonly);
 }
 
 if (!empty($add)) {
@@ -72,7 +83,9 @@ if (!empty($add)) {
 
     list($module, $context, $cw, $cm, $data) = prepare_new_moduleinfo_data($course, $add, $section);
     $data->return = 0;
-    $data->sr = $sectionreturn;
+    if (!is_null($sectionreturn)) {
+        $data->sr = $sectionreturn;
+    }
     $data->add = $add;
     $data->beforemod = $beforemod;
     if (!empty($type)) { //TODO: hopefully will be removed in 2.0
@@ -81,15 +94,7 @@ if (!empty($add)) {
 
     $sectionname = get_section_name($course, $cw);
     $fullmodulename = get_string('modulename', $module->name);
-
-    if ($data->section && $course->format != 'site') {
-        $heading = new stdClass();
-        $heading->what = $fullmodulename;
-        $heading->to   = $sectionname;
-        $pageheading = get_string('addinganewto', 'moodle', $heading);
-    } else {
-        $pageheading = get_string('addinganew', 'moodle', $fullmodulename);
-    }
+    $pageheading = $pagetitle = get_string('addinganew', 'moodle', $fullmodulename);
     $navbaraddition = $pageheading;
 
 } else if (!empty($update)) {
@@ -111,20 +116,18 @@ if (!empty($add)) {
 
     list($cm, $context, $module, $data, $cw) = get_moduleinfo_data($cm, $course);
     $data->return = $return;
-    $data->sr = $sectionreturn;
+    if (!is_null($sectionreturn)) {
+        $data->sr = $sectionreturn;
+    }
     $data->update = $update;
+    if (!empty($showonly)) {
+        $data->showonly = $showonly;
+    }
 
     $sectionname = get_section_name($course, $cw);
     $fullmodulename = get_string('modulename', $module->name);
-
-    if ($data->section && $course->format != 'site') {
-        $heading = new stdClass();
-        $heading->what = $fullmodulename;
-        $heading->in   = $sectionname;
-        $pageheading = get_string('updatingain', 'moodle', $heading);
-    } else {
-        $pageheading = get_string('updatinga', 'moodle', $fullmodulename);
-    }
+    $pageheading = get_string('editsettings', 'moodle');
+    $pagetitle = get_string('edita', 'moodle', $fullmodulename) . ': ' . $cm->name;
     $navbaraddition = null;
 
 } else {
@@ -153,6 +156,9 @@ if (file_exists($modmoodleform)) {
 $mformclassname = 'mod_'.$module->name.'_mod_form';
 $mform = new $mformclassname($data, $cw->section, $cm, $course);
 $mform->set_data($data);
+if (!empty($showonly)) {
+    $mform->filter_shown_headers(explode(',', $showonly));
+}
 
 if ($mform->is_cancelled()) {
     if ($return && !empty($cm->id)) {
@@ -163,7 +169,11 @@ if ($mform->is_cancelled()) {
         $activityurl = new moodle_url("/mod/$module->name/view.php", $urlparams);
         redirect($activityurl);
     } else {
-        redirect(course_get_url($course, $cw->section, array('sr' => $sectionreturn)));
+        $options = [];
+        if (!is_null($sectionreturn)) {
+            $options['sr'] = $sectionreturn;
+        }
+        redirect(course_get_url($course, $cw->section, $options));
     }
 } else if ($fromform = $mform->get_data()) {
     // Mark that this is happening in the front-end UI. This is used to indicate that we are able to
@@ -183,7 +193,11 @@ if ($mform->is_cancelled()) {
             $url = $fromform->gradingman->get_management_url($url);
         }
     } else {
-        $url = course_get_url($course, $cw->section, array('sr' => $sectionreturn));
+        $options = [];
+        if (!is_null($sectionreturn)) {
+            $options['sr'] = $sectionreturn;
+        }
+        $url = course_get_url($course, $cw->section, $options);
     }
 
     // If we need to regrade the course with a progress bar as a result of updating this module,
@@ -197,10 +211,6 @@ if ($mform->is_cancelled()) {
     exit;
 
 } else {
-
-    $streditinga = get_string('editinga', 'moodle', $fullmodulename);
-    $strmodulenameplural = get_string('modulenameplural', $module->name);
-
     if (!empty($cm->id)) {
         $context = context_module::instance($cm->id);
     } else {
@@ -208,7 +218,10 @@ if ($mform->is_cancelled()) {
     }
 
     $PAGE->set_heading($course->fullname);
-    $PAGE->set_title($streditinga);
+    if ($course->id !== $SITE->id) {
+        $pagetitle = $pagetitle . moodle_page::TITLE_SEPARATOR . $course->shortname;
+    }
+    $PAGE->set_title($pagetitle);
     $PAGE->set_cacheable(false);
 
     if (isset($navbaraddition)) {
@@ -217,12 +230,7 @@ if ($mform->is_cancelled()) {
     $PAGE->activityheader->disable();
 
     echo $OUTPUT->header();
-
-    if (get_string_manager()->string_exists('modulename_help', $module->name)) {
-        echo $OUTPUT->heading_with_help($pageheading, 'modulename', $module->name, 'monologo');
-    } else {
-        echo $OUTPUT->heading_with_help($pageheading, '', $module->name, 'monologo');
-    }
+    echo $OUTPUT->heading_with_help($pageheading, '', $module->name);
 
     $mform->display();
 

@@ -1289,7 +1289,7 @@ function glossary_print_entry_icons($course, $cm, $glossary, $entry, $mode='',$h
 
             $url = "edit.php?cmid=$cm->id&amp;id=$entry->id&amp;mode=$mode&amp;hook=".urlencode($hook);
             $return .= "<a class='icon' title=\"" . get_string("edit") . "\" href=\"$url\">" .
-                       $OUTPUT->pix_icon('t/edit', get_string('editentrya', 'mod_glossary', $altsuffix)) . '</a>';
+                       $OUTPUT->pix_icon('i/edit', get_string('editentrya', 'mod_glossary', $altsuffix)) . '</a>';
         } elseif ( $importedentry ) {
             $return .= "<font size=\"-1\">" . get_string("exportedentry","glossary") . "</font>";
         }
@@ -3167,7 +3167,7 @@ function glossary_extend_settings_navigation(settings_navigation $settings, navi
     // Safe guard check - Ideally, there shouldn't be any hidden entries if the glossary has 'defaultapproval'.
     if (has_capability('mod/glossary:approve', $settings->get_page()->cm->context) &&
             (!$glossary->defaultapproval || $hiddenentries)) {
-        $glossarynode->add(get_string('pendingapproval', 'glossary'),
+        $glossarynode->add(get_string('pendingapprovalcount', 'glossary', $hiddenentries),
             new moodle_url('/mod/glossary/view.php', ['id' => $settings->get_page()->cm->id, 'mode' => 'approval']),
             navigation_node::TYPE_CUSTOM, null, 'pendingapproval');
     }

@@ -103,7 +103,7 @@ class ADODB_db2 extends ADOConnection {
 
 	private function doDB2Connect($argDSN, $argUsername, $argPassword, $argDatabasename, $persistent=false)
 	{
-		
+
 		if (!function_exists('db2_connect')) {
 			ADOConnection::outp("DB2 extension not installed.");
 			return null;
@@ -174,7 +174,7 @@ class ADODB_db2 extends ADOConnection {
 												null,
 												$db2Options);
 
-		
+
 		$this->_errorMsg = @db2_conn_errormsg();
 
 		if ($this->_connectionID && $this->connectStmt)
@@ -197,7 +197,7 @@ class ADODB_db2 extends ADOConnection {
 	private function unpackParameters($argDSN, $argUsername, $argPassword, $argDatabasename)
 	{
 
-		
+
 		$connectionParameters = array('dsn'=>'',
 									  'uid'=>'',
 									  'pwd'=>'',
@@ -247,7 +247,7 @@ class ADODB_db2 extends ADOConnection {
 				$errorMessage = 'Supply uncatalogued connection parameters ';
 				$errorMessage.= 'in either the database or DSN arguments, ';
 				$errorMessage.= 'but not both';
-			
+
 				if ($this->debug)
 					ADOConnection::outp($errorMessage);
 				return null;
@@ -272,7 +272,7 @@ class ADODB_db2 extends ADOConnection {
 			{
 				$errorMessage = 'For uncatalogued connections, provide ';
 				$errorMessage.= 'both UID and PWD in the connection string';
-				
+
 				if ($this->debug)
 					ADOConnection::outp($errorMessage);
 				return null;
@@ -307,7 +307,7 @@ class ADODB_db2 extends ADOConnection {
 			{
 				$errorMessage = 'Uncatalogued connection parameters ';
 				$errorMessage.= 'must contain a database= argument';
-				
+
 				if ($this->debug)
 					ADOConnection::outp($errorMessage);
 				return null;
@@ -1568,7 +1568,7 @@ See http://msdn.microsoft.com/library/default.asp?url=/library/en-us/db2/htm/db2
 	 *
 	 * @return mixed				either the queryID or false
 	 */
-	function _query(&$sql,$inputarr=false)
+	function _query($sql, $inputarr = false)
 	{
 		$db2Options = array();
 		/*
@@ -1605,10 +1605,10 @@ See http://msdn.microsoft.com/library/default.asp?url=/library/en-us/db2/htm/db2
 				{
 					$this->_errorMsg  = @db2_stmt_errormsg();
 					$this->_errorCode = @db2_stmt_error();
-					
+
 					if ($this->debug)
 						ADOConnection::outp($this->_errorMsg);
-					
+
 					return false;
 				}
 			}
@@ -1989,7 +1989,6 @@ class ADORecordSet_db2 extends ADORecordSet {
 				ADOConnection::outp($this->connection->_errorMsg);
 			return false;
 		}
-
 	}
 
 }

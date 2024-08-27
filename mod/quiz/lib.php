@@ -26,10 +26,11 @@
  */
 
 
+use qbank_managecategories\helper;
+
 defined('MOODLE_INTERNAL') || die();
 
 use mod_quiz\access_manager;
-use mod_quiz\form\add_random_form;
 use mod_quiz\grade_calculator;
 use mod_quiz\question\bank\custom_view;
 use mod_quiz\question\bank\qbank_helper;
@@ -37,10 +38,12 @@ use mod_quiz\question\display_options;
 use mod_quiz\question\qubaids_for_quiz;
 use mod_quiz\question\qubaids_for_users_attempts;
 use core_question\statistics\questions\all_calculated_for_qubaid_condition;
+use mod_quiz\local\override_cache;
 use mod_quiz\quiz_attempt;
 use mod_quiz\quiz_settings;
 
 require_once($CFG->dirroot . '/calendar/lib.php');
+require_once($CFG->dirroot . '/question/editlib.php');
 
 /**#@+
  * Option controlling what options are offered on the quiz settings form.
@@ -188,7 +191,11 @@ function quiz_delete_instance($id) {
     $quiz = $DB->get_record('quiz', ['id' => $id], '*', MUST_EXIST);
 
     quiz_delete_all_attempts($quiz);
-    quiz_delete_all_overrides($quiz);
+
+    // Delete all overrides, and for performance do not log or check permissions.
+    $quizobj = quiz_settings::create($quiz->id);
+    $quizobj->get_override_manager()->delete_all_overrides(shouldlog: false);
+
     quiz_delete_references($quiz->id);
 
     // We need to do the following deletes before we try and delete randoms, otherwise they would still be 'in use'.
@@ -210,86 +217,6 @@ function quiz_delete_instance($id) {
     $DB->delete_records('quiz', ['id' => $quiz->id]);
 
     return true;
-}
-
-/**
- * Deletes a quiz override from the database and clears any corresponding calendar events
- *
- * @param stdClass $quiz The quiz object.
- * @param int $overrideid The id of the override being deleted
- * @param bool $log Whether to trigger logs.
- * @return bool true on success
- */
-function quiz_delete_override($quiz, $overrideid, $log = true) {
-    global $DB;
-
-    if (!isset($quiz->cmid)) {
-        $cm = get_coursemodule_from_instance('quiz', $quiz->id, $quiz->course);
-        $quiz->cmid = $cm->id;
-    }
-
-    $override = $DB->get_record('quiz_overrides', ['id' => $overrideid], '*', MUST_EXIST);
-
-    // Delete the events.
-    if (isset($override->groupid)) {
-        // Create the search array for a group override.
-        $eventsearcharray = ['modulename' => 'quiz',
-            'instance' => $quiz->id, 'groupid' => (int)$override->groupid];
-        $cachekey = "{$quiz->id}_g_{$override->groupid}";
-    } else {
-        // Create the search array for a user override.
-        $eventsearcharray = ['modulename' => 'quiz',
-            'instance' => $quiz->id, 'userid' => (int)$override->userid];
-        $cachekey = "{$quiz->id}_u_{$override->userid}";
-    }
-    $events = $DB->get_records('event', $eventsearcharray);
-    foreach ($events as $event) {
-        $eventold = calendar_event::load($event);
-        $eventold->delete();
-    }
-
-    $DB->delete_records('quiz_overrides', ['id' => $overrideid]);
-    cache::make('mod_quiz', 'overrides')->delete($cachekey);
-
-    if ($log) {
-        // Set the common parameters for one of the events we will be triggering.
-        $params = [
-            'objectid' => $override->id,
-            'context' => context_module::instance($quiz->cmid),
-            'other' => [
-                'quizid' => $override->quiz
-            ]
-        ];
-        // Determine which override deleted event to fire.
-        if (!empty($override->userid)) {
-            $params['relateduserid'] = $override->userid;
-            $event = \mod_quiz\event\user_override_deleted::create($params);
-        } else {
-            $params['other']['groupid'] = $override->groupid;
-            $event = \mod_quiz\event\group_override_deleted::create($params);
-        }
-
-        // Trigger the override deleted event.
-        $event->add_record_snapshot('quiz_overrides', $override);
-        $event->trigger();
-    }
-
-    return true;
-}
-
-/**
- * Deletes all quiz overrides from the database and clears any corresponding calendar events
- *
- * @param stdClass $quiz The quiz object.
- * @param bool $log Whether to trigger logs.
- */
-function quiz_delete_all_overrides($quiz, $log = true) {
-    global $DB;
-
-    $overrides = $DB->get_records('quiz_overrides', ['quiz' => $quiz->id], 'id');
-    foreach ($overrides as $override) {
-        quiz_delete_override($quiz, $override->id, $log);
-    }
 }
 
 /**
@@ -662,7 +589,7 @@ function quiz_get_user_grades($quiz, $userid = 0) {
  * Round a grade to the correct number of decimal places, and format it for display.
  *
  * @param stdClass $quiz The quiz table row, only $quiz->decimalpoints is used.
- * @param float $grade The grade to round.
+ * @param float|null $grade The grade to round and display (or null meaning no grade).
  * @return string
  */
 function quiz_format_grade($quiz, $grade) {
@@ -1117,6 +1044,7 @@ function quiz_process_options($quiz) {
     // Combing the individual settings into the review columns.
     $quiz->reviewattempt = quiz_review_option_form_to_db($quiz, 'attempt');
     $quiz->reviewcorrectness = quiz_review_option_form_to_db($quiz, 'correctness');
+    $quiz->reviewmaxmarks = quiz_review_option_form_to_db($quiz, 'maxmarks');
     $quiz->reviewmarks = quiz_review_option_form_to_db($quiz, 'marks');
     $quiz->reviewspecificfeedback = quiz_review_option_form_to_db($quiz, 'specificfeedback');
     $quiz->reviewgeneralfeedback = quiz_review_option_form_to_db($quiz, 'generalfeedback');
@@ -1617,7 +1545,7 @@ function quiz_reset_userdata($data) {
     }
 
     if ($purgeoverrides) {
-        cache::make('mod_quiz', 'overrides')->purge();
+        \cache_helper::purge_by_event(\mod_quiz\local\override_cache::INVALIDATION_USERDATARESET);
     }
 
     return $status;
@@ -1942,8 +1870,7 @@ function quiz_check_updates_since(cm_info $cm, $from, $filter = []) {
     $updates->questions = (object) ['updated' => false];
     $quizobj = quiz_settings::create($cm->instance, $USER->id);
     $quizobj->preload_questions();
-    $quizobj->load_questions();
-    $questionids = array_keys($quizobj->get_questions());
+    $questionids = array_keys($quizobj->get_questions(null, false));
     if (!empty($questionids)) {
         list($questionsql, $params) = $DB->get_in_or_equal($questionids, SQL_PARAMS_NAMED);
         $select = 'id ' . $questionsql . ' AND (timemodified > :time1 OR timecreated > :time2)';
@@ -2156,8 +2083,8 @@ function quiz_get_coursemodule_info($coursemodule) {
 function mod_quiz_cm_info_dynamic(cm_info $cm) {
     global $USER;
 
-    $cache = cache::make('mod_quiz', 'overrides');
-    $override = $cache->get("{$cm->instance}_u_{$USER->id}");
+    $cache = new override_cache($cm->instance);
+    $override = $cache->get_cached_user_override($USER->id);
 
     if (!$override) {
         $override = (object) [
@@ -2172,7 +2099,7 @@ function mod_quiz_cm_info_dynamic(cm_info $cm) {
         $closes = [];
         $groupings = groups_get_user_groups($cm->course, $USER->id);
         foreach ($groupings[0] as $groupid) {
-            $groupoverride = $cache->get("{$cm->instance}_g_{$groupid}");
+            $groupoverride = $cache->get_cached_group_override($groupid);
             if (isset($groupoverride->timeopen)) {
                 $opens[] = $groupoverride->timeopen;
             }
@@ -2392,27 +2319,27 @@ function mod_quiz_core_calendar_event_timestart_updated(\calendar_event $event, 
  * @param array $args The fragment arguments.
  * @return string The rendered mform fragment.
  */
-function mod_quiz_output_fragment_quiz_question_bank($args) {
-    global $CFG, $DB, $PAGE;
-    require_once($CFG->dirroot . '/mod/quiz/locallib.php');
-    require_once($CFG->dirroot . '/question/editlib.php');
+function mod_quiz_output_fragment_quiz_question_bank($args): string {
+    global $PAGE;
 
-    $querystring = preg_replace('/^\?/', '', $args['querystring']);
+    // Retrieve params.
     $params = [];
+    $extraparams = [];
+    $querystring = parse_url($args['querystring'], PHP_URL_QUERY);
     parse_str($querystring, $params);
 
-    // Build the required resources. The $params are all cleaned as
-    // part of this process.
-    list($thispageurl, $contexts, $cmid, $cm, $quiz, $pagevars) =
-            question_build_edit_resources('editq', '/mod/quiz/edit.php', $params, custom_view::DEFAULT_PAGE_SIZE);
+    $viewclass = \mod_quiz\question\bank\custom_view::class;
+    $extraparams['view'] = $viewclass;
 
-    // Get the course object and related bits.
-    $course = get_course($quiz->course);
+    // Build required parameters.
+    [$contexts, $thispageurl, $cm, $pagevars, $extraparams] =
+            build_required_parameters_for_custom_view($params, $extraparams);
+
+    $course = get_course($cm->course);
     require_capability('mod/quiz:manage', $contexts->lowest());
 
-    // Create quiz question bank view.
-    $questionbank = new custom_view($contexts, $thispageurl, $course, $cm, $quiz);
-    $questionbank->set_quiz_has_attempts(quiz_has_attempts($quiz->id));
+    // Custom View.
+    $questionbank = new $viewclass($contexts, $thispageurl, $course, $cm, $pagevars, $extraparams);
 
     // Output.
     $renderer = $PAGE->get_renderer('mod_quiz', 'edit');
@@ -2433,32 +2360,57 @@ function mod_quiz_output_fragment_quiz_question_bank($args) {
  * @return string The rendered mform fragment.
  */
 function mod_quiz_output_fragment_add_random_question_form($args) {
-    global $CFG;
+    global $PAGE, $OUTPUT;
 
-    $contexts = new \core_question\local\bank\question_edit_contexts($args['context']);
-    $formoptions = [
-        'contexts' => $contexts,
-        'cat' => $args['cat']
+    $extraparams = [];
+
+    // Build required parameters.
+    [$contexts, $thispageurl, $cm, $pagevars, $extraparams] =
+            build_required_parameters_for_custom_view($args, $extraparams);
+
+    // Additional param to differentiate with other question bank view.
+    $extraparams['view'] = mod_quiz\question\bank\random_question_view::class;
+
+    $course = get_course($cm->course);
+    require_capability('mod/quiz:manage', $contexts->lowest());
+
+    // Custom View.
+    $questionbank = new mod_quiz\question\bank\random_question_view($contexts, $thispageurl, $course, $cm, $pagevars, $extraparams);
+
+    $renderer = $PAGE->get_renderer('mod_quiz', 'edit');
+    $questionbankoutput = $renderer->question_bank_contents($questionbank, $pagevars);
+
+    $maxrand = 100;
+    for ($i = 1; $i <= min(100, $maxrand); $i++) {
+        $randomcount[] = ['value' => $i, 'name' => $i];
+    }
+
+    // Parent category select.
+    $usablecontexts = $contexts->having_cap('moodle/question:useall');
+    $categoriesarray = helper::question_category_options($usablecontexts);
+    $catoptions = [];
+    foreach ($categoriesarray as $group => $opts) {
+        // Options for each category group.
+        $categories = [];
+        foreach ($opts as $context => $name) {
+            $categories[] = ['value' => $context, 'name' => $name];
+        }
+        $catoptions[] = ['label' => $group, 'options' => $categories];
+    }
+
+    // Template data.
+    $data = [
+        'questionbank' => $questionbankoutput,
+        'randomoptions' => $randomcount,
+        'questioncategoryoptions' => $catoptions,
     ];
-    $formdata = [
-        'category' => $args['cat'],
-        'addonpage' => $args['addonpage'],
-        'returnurl' => $args['returnurl'],
-        'cmid' => $args['cmid']
-    ];
 
-    $form = new add_random_form(
-        new \moodle_url('/mod/quiz/addrandom.php'),
-        $formoptions,
-        'post',
-        '',
-        null,
-        true,
-        $formdata
-    );
-    $form->set_data($formdata);
+    $helpicon = new \help_icon('parentcategory', 'question');
+    $data['questioncategoryhelp'] = $helpicon->export_for_template($renderer);
 
-    return $form->render();
+    $result = $OUTPUT->render_from_template('mod_quiz/add_random_question_form', $data);
+
+    return $result;
 }
 
 /**
@@ -2485,24 +2437,86 @@ function mod_quiz_core_calendar_get_event_action_string(string $eventtype): stri
 }
 
 /**
- * Delete question reference data.
+ * Delete all question references for a quiz.
  *
  * @param int $quizid The id of quiz.
  */
 function quiz_delete_references($quizid): void {
     global $DB;
-    $slots = $DB->get_records('quiz_slots', ['quizid' => $quizid]);
-    foreach ($slots as $slot) {
-        $params = [
-            'itemid' => $slot->id,
-            'component' => 'mod_quiz',
-            'questionarea' => 'slot'
-        ];
-        // Delete any set references.
-        $DB->delete_records('question_set_references', $params);
-        // Delete any references.
-        $DB->delete_records('question_references', $params);
+
+    $cm = get_coursemodule_from_instance('quiz', $quizid);
+    $context = context_module::instance($cm->id);
+
+    $conditions = [
+        'usingcontextid' => $context->id,
+        'component' => 'mod_quiz',
+        'questionarea' => 'slot',
+    ];
+
+    $DB->delete_records('question_references', $conditions);
+    $DB->delete_records('question_set_references', $conditions);
+}
+
+/**
+ * Question data fragment to get the question html via ajax call.
+ *
+ * @param array $args
+ * @return string
+ */
+function mod_quiz_output_fragment_question_data(array $args): string {
+    // Return if there is no args.
+    if (empty($args)) {
+        return '';
     }
+
+    // Retrieve params from query string.
+    [$params, $extraparams] = \core_question\local\bank\filter_condition_manager::extract_parameters_from_fragment_args($args);
+
+    // Build required parameters.
+    $cmid = clean_param($args['cmid'], PARAM_INT);
+    $thispageurl = new \moodle_url('/mod/quiz/edit.php', ['cmid' => $cmid]);
+    $thiscontext = \context_module::instance($cmid);
+    $contexts = new \core_question\local\bank\question_edit_contexts($thiscontext);
+    $defaultcategory = question_make_default_categories($contexts->all());
+    $params['cat'] = implode(',', [$defaultcategory->id, $defaultcategory->contextid]);
+
+    $course = get_course($params['courseid']);
+    [, $cm] = get_module_from_cmid($cmid);
+    $params['tabname'] = 'questions';
+
+    // Custom question bank View.
+    $viewclass = clean_param($args['view'], PARAM_NOTAGS);
+    $questionbank = new $viewclass($contexts, $thispageurl, $course, $cm, $params, $extraparams);
+
+    // Question table.
+    $questionbank->add_standard_search_conditions();
+    ob_start();
+    $questionbank->display_question_list();
+    return ob_get_clean();
+}
+
+/**
+ * Build required parameters for question bank custom view
+ *
+ * @param array $params the page parameters
+ * @param array $extraparams additional parameters
+ * @return array
+ */
+function build_required_parameters_for_custom_view(array $params, array $extraparams): array {
+    // Retrieve questions per page.
+    $viewclass = $extraparams['view'] ?? null;
+    $defaultpagesize = $viewclass ? $viewclass::DEFAULT_PAGE_SIZE : DEFAULT_QUESTIONS_PER_PAGE;
+    // Build the required params.
+    [$thispageurl, $contexts, $cmid, $cm, , $pagevars] = question_build_edit_resources(
+            'editq',
+            '/mod/quiz/edit.php',
+            array_merge($params, $extraparams),
+            $defaultpagesize);
+
+    // Add cmid so we can retrieve later in extra params.
+    $extraparams['cmid'] = $cmid;
+
+    return [$contexts, $thispageurl, $cm, $pagevars, $extraparams];
 }
 
 /**
@@ -2519,4 +2533,22 @@ function mod_quiz_calculate_question_stats(context $context): ?all_calculated_fo
     $cm = get_coursemodule_from_id('quiz', $context->instanceid);
     $report = new quiz_statistics_report();
     return $report->calculate_questions_stats_for_question_bank($cm->instance, false, false);
+}
+
+/**
+ * Return a list of all the user preferences used by mod_quiz.
+ *
+ * @uses core_user::is_current_user
+ *
+ * @return array[]
+ */
+function mod_quiz_user_preferences(): array {
+    $preferences = [];
+    $preferences['quiz_timerhidden'] = [
+        'type' => PARAM_INT,
+        'null' => NULL_NOT_ALLOWED,
+        'default' => '0',
+        'permissioncallback' => [core_user::class, 'is_current_user'],
+    ];
+    return $preferences;
 }

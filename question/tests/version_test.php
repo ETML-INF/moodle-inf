@@ -17,6 +17,7 @@
 namespace core_question;
 
 use core_question\local\bank\question_version_status;
+use core_question\output\question_version_info;
 use question_bank;
 
 /**
@@ -65,12 +66,17 @@ class version_test extends \advanced_testcase {
         $this->context = \context_module::instance($this->quiz->cmid);
     }
 
+    protected function tearDown(): void {
+        question_version_info::$pendingdefinitions = [];
+        parent::tearDown();
+    }
+
     /**
      * Test if creating a question a new version and bank entry records are created.
      *
      * @covers ::load_question
      */
-    public function test_make_question_create_version_and_bank_entry() {
+    public function test_make_question_create_version_and_bank_entry(): void {
         global $DB;
 
         $qcategory = $this->qgenerator->create_question_category(['contextid' => $this->context->id]);
@@ -105,7 +111,7 @@ class version_test extends \advanced_testcase {
      * @covers ::load_question
      * @covers ::question_delete_question
      */
-    public function test_delete_question_delete_versions() {
+    public function test_delete_question_delete_versions(): void {
         global $DB;
 
         $qcategory = $this->qgenerator->create_question_category(['contextid' => $this->context->id]);
@@ -158,7 +164,7 @@ class version_test extends \advanced_testcase {
      * @covers ::quiz_add_quiz_question
      * @covers ::question_delete_question
      */
-    public function test_delete_question_in_use() {
+    public function test_delete_question_in_use(): void {
         global $DB;
 
         $qcategory = $this->qgenerator->create_question_category(['contextid' => $this->context->id]);
@@ -191,7 +197,7 @@ class version_test extends \advanced_testcase {
      * @covers ::load_question
      * @covers ::quiz_add_quiz_question
      */
-    public function test_move_category_with_questions() {
+    public function test_move_category_with_questions(): void {
         global $DB;
 
         $qcategory = $this->qgenerator->create_question_category(['contextid' => $this->context->id]);
@@ -226,7 +232,7 @@ class version_test extends \advanced_testcase {
      *
      * @covers ::load_question
      */
-    public function test_id_number_in_bank_entry() {
+    public function test_id_number_in_bank_entry(): void {
         global $DB;
 
         $qcategory = $this->qgenerator->create_question_category(['contextid' => $this->context->id]);
@@ -265,7 +271,7 @@ class version_test extends \advanced_testcase {
      *
      * @covers ::get_all_versions_of_question
      */
-    public function test_get_all_versions_of_question() {
+    public function test_get_all_versions_of_question(): void {
         $qcategory = $this->qgenerator->create_question_category(['contextid' => $this->context->id]);
         $question = $this->qgenerator->create_question('shortanswer', null,
             [
@@ -294,7 +300,7 @@ class version_test extends \advanced_testcase {
      *
      * @covers ::get_all_versions_of_questions
      */
-    public function test_get_all_versions_of_questions() {
+    public function test_get_all_versions_of_questions(): void {
         global $DB;
 
         $questionversions = [];
@@ -319,5 +325,48 @@ class version_test extends \advanced_testcase {
         $questionbankentryids = array_keys($questionversionsofquestions)[0];
         $this->assertEquals($questionbankentryid->questionbankentryid, $questionbankentryids);
         $this->assertEquals($questionversions, $questionversionsofquestions[$questionbankentryids]);
+    }
+
+    /**
+     * Test population of latestversion field in question_definition objects
+     *
+     * When an instance of question_definition is created, it is added to an array of pending definitions which
+     * do not yet have the latestversion field populated. When one definition has its latestversion property accessed,
+     * all pending definitions have their latestversion field populated at once.
+     *
+     * @covers \core_question\output\question_version_info::populate_latest_versions()
+     * @return void
+     */
+    public function test_populate_definition_latestversions(): void {
+        $qcategory = $this->qgenerator->create_question_category(['contextid' => $this->context->id]);
+        $question1 = $this->qgenerator->create_question('shortanswer', null, ['category' => $qcategory->id]);
+        $question2 = $this->qgenerator->create_question('shortanswer', null, ['category' => $qcategory->id]);
+        $question3 = $this->qgenerator->update_question($question2, null, ['idnumber' => 'id2']);
+
+        $latestversioninspector = new \ReflectionProperty('question_definition', 'latestversion');
+        $this->assertEmpty(question_version_info::$pendingdefinitions);
+
+        $questiondef1 = question_bank::load_question($question1->id);
+        $questiondef2 = question_bank::load_question($question2->id);
+        $questiondef3 = question_bank::load_question($question3->id);
+
+        $this->assertContains($questiondef1, question_version_info::$pendingdefinitions);
+        $this->assertContains($questiondef2, question_version_info::$pendingdefinitions);
+        $this->assertContains($questiondef3, question_version_info::$pendingdefinitions);
+        $this->assertNull($latestversioninspector->getValue($questiondef1));
+        $this->assertNull($latestversioninspector->getValue($questiondef2));
+        $this->assertNull($latestversioninspector->getValue($questiondef3));
+
+        // Read latestversion from one definition. This should populate the field in all pending definitions.
+        $latestversion1 = $questiondef1->latestversion;
+
+        $this->assertEmpty(question_version_info::$pendingdefinitions);
+        $this->assertNotNull($latestversioninspector->getValue($questiondef1));
+        $this->assertNotNull($latestversioninspector->getValue($questiondef2));
+        $this->assertNotNull($latestversioninspector->getValue($questiondef3));
+        $this->assertEquals($latestversion1, $latestversioninspector->getValue($questiondef1));
+        $this->assertEquals($questiondef1->version, $questiondef1->latestversion);
+        $this->assertNotEquals($questiondef2->version, $questiondef2->latestversion);
+        $this->assertEquals($questiondef3->version, $questiondef3->latestversion);
     }
 }

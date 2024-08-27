@@ -148,7 +148,7 @@ class external_api {
             } else if (method_exists($function->classname, $function->ajax_method)) {
                 if (call_user_func([$function->classname, $function->ajax_method]) === true) {
                     debugging('External function ' . $function->ajax_method . '() function is deprecated.' .
-                              'Set ajax=>true in db/service.php instead.', DEBUG_DEVELOPER);
+                              'Set ajax=>true in db/services.php instead.', DEBUG_DEVELOPER);
                     $function->allowed_from_ajax = true;
                 }
             }
@@ -314,6 +314,9 @@ class external_api {
      * @since Moodle 2.0
      */
     public static function validate_parameters(external_description $description, $params) {
+        if ($params === null && $description->allownull == NULL_ALLOWED) {
+            return null;
+        }
         if ($description instanceof external_value) {
             if (is_array($params) || is_object($params)) {
                 throw new invalid_parameter_exception('Scalar type expected, array or object received.');
@@ -400,6 +403,9 @@ class external_api {
      * @since Moodle 2.0
      */
     public static function clean_returnvalue(external_description $description, $response) {
+        if ($response === null && $description->allownull == NULL_ALLOWED) {
+            return null;
+        }
         if ($description instanceof external_value) {
             if (is_array($response) || is_object($response)) {
                 throw new invalid_response_exception('Scalar type expected, array or object received.');

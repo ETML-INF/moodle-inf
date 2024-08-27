@@ -346,7 +346,7 @@ class assign_submission_file extends assign_submission_plugin {
                                      'assignsubmission_file',
                                      ASSIGNSUBMISSION_FILE_FILEAREA,
                                      $submission->id,
-                                     'timemodified',
+                                     'timemodified, id',
                                      false);
 
         foreach ($files as $file) {
@@ -507,19 +507,6 @@ class assign_submission_file extends assign_submission_plugin {
                             array('assignment'=>$this->assignment->get_instance()->id));
 
         return true;
-    }
-
-    /**
-     * Formatting for log info
-     *
-     * @param stdClass $submission The submission
-     * @return string
-     */
-    public function format_for_log(stdClass $submission) {
-        // Format the info for each submission plugin (will be added to log).
-        $filecount = $this->count_files($submission->id, ASSIGNSUBMISSION_FILE_FILEAREA);
-
-        return get_string('numfilesforlog', 'assignsubmission_file', $filecount);
     }
 
     /**

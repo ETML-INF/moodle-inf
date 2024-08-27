@@ -10,39 +10,29 @@ Feature: Pass grade completion in the glossary activity
       | student1 | Vinnie    | Student1 | student1@example.com |
       | teacher1 | Darrell   | Teacher1 | teacher1@example.com |
     And the following "courses" exist:
-      | fullname | shortname | category |
-      | Course 1 | C1        | 0        |
+      | fullname | shortname | category | enablecompletion |
+      | Course 1 | C1        | 0        | 1                |
     And the following "course enrolments" exist:
       | user | course | role           |
       | student1 | C1 | student        |
       | teacher1 | C1 | editingteacher |
-    And I log in as "teacher1"
-    And I am on "Course 1" course homepage
-    And I navigate to "Settings" in current page administration
-    And I expand all fieldsets
-    And I set the following fields to these values:
-      | Enable completion tracking | Yes |
-      | Show activity completion conditions | Yes |
-    And I press "Save and display"
     And the following "activity" exists:
       | activity | glossary      |
       | course   | C1            |
       | idnumber | mh1           |
       | name     | Music history |
       | section  | 1             |
-    And I am on "Course 1" course homepage
-    And I follow "Music history"
-    And I navigate to "Settings" in current page administration
+    When I am on the "Music history" "glossary activity editing" page logged in as teacher1
     And I expand all fieldsets
     And I set the following fields to these values:
       | Aggregate type           | Average of ratings                                |
       | scale[modgrade_type]     | Point                                             |
       | scale[modgrade_point]    | 100                                               |
       | Ratings > Grade to pass  | 50                                                |
-      | Completion tracking      | Show activity as complete when conditions are met |
-      | Require view             | 1                                                 |
-      | Require grade            | 1                                                 |
-      | completionpassgrade      | 1                                                 |
+      | Add requirements         | 1                  |
+      | View the activity        | 1                                                 |
+      | Receive a grade          | 1                                                 |
+      | Passing grade            | 1                                                 |
       | completionentriesenabled | 1                                                 |
       | completionentries        | 1                                                 |
     And I press "Save and display"

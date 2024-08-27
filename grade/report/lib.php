@@ -344,7 +344,7 @@ abstract class grade_report {
      */
     public function get_lang_string($strcode, $section=null) {
         debugging('grade_report::get_lang_string() is deprecated, please use' .
-            ' grade_helper::get_lang_string() instead.', DEBUG_DEVELOPER);
+            ' get_string() instead.', DEBUG_DEVELOPER);
 
         if (empty($this->lang_strings[$strcode])) {
             $this->lang_strings[$strcode] = get_string($strcode, $section);
@@ -492,7 +492,7 @@ abstract class grade_report {
             [
                 'where' => $keywordswhere,
                 'params' => $keywordsparams,
-            ] = $this->get_users_search_sql($mappings, (array)$userfields);
+            ] = $this->get_users_search_sql($mappings, $userfields->get_required_fields());
             $this->userwheresql .= " AND $keywordswhere";
             $this->userwheresql_params = array_merge($this->userwheresql_params, $keywordsparams);
         }
@@ -596,9 +596,15 @@ abstract class grade_report {
         global $OUTPUT;
         $pix = ['up' => 't/sort_desc', 'down' => 't/sort_asc'];
         $matrix = ['up' => 'desc', 'down' => 'asc'];
-        $strsort = grade_helper::get_lang_string($matrix[$direction], 'moodle');
+        $strsort = get_string($matrix[$direction], 'moodle');
         $arrow = $OUTPUT->pix_icon($pix[$direction], '', '', ['class' => 'sorticon']);
-        return html_writer::link($sortlink, $arrow, ['title' => $strsort, 'aria-label' => $strsort, 'data-collapse' => 'sort']);
+
+        if (!empty($sortlink)) {
+            $sortlink->param('sort', ($direction == 'up' ? 'asc' : 'desc'));
+        }
+
+        return html_writer::link($sortlink, $arrow, ['title' => $strsort, 'aria-label' => $strsort, 'data-collapse' => 'sort',
+            'class' => 'arrow_link py-1']);
     }
 
     /**
@@ -757,7 +763,6 @@ abstract class grade_report {
 
     /**
      * Calculate average grade for a given grade item.
-     * Based on calculate_averages function from grade/report/user/lib.php
      *
      * @param grade_item $gradeitem Grade item
      * @param array $info Ungraded grade items counts and report preferences.
@@ -801,16 +806,33 @@ abstract class grade_report {
     }
 
     /**
-     * Get ungraded grade items info and sum of all grade items in a course.
-     * Based on calculate_averages function from grade/report/user/lib.php
+     * To check if we only need to include active enrolments.
      *
+     * @return bool
+     */
+    public function show_only_active(): bool {
+        global $CFG;
+
+        // Limit to users with an active enrolment.
+        $defaultgradeshowactiveenrol = !empty($CFG->grade_report_showonlyactiveenrol);
+        $showonlyactiveenrol = get_user_preferences('grade_report_showonlyactiveenrol', $defaultgradeshowactiveenrol);
+        return $showonlyactiveenrol ||
+            !has_capability('moodle/course:viewsuspendedusers', $this->context);
+    }
+
+    /**
+     * Get ungraded grade items info and sum of all grade items in a course.
+     *
+     * @param bool $grouponly If we want to compute group average only.
+     * @param bool $includehiddengrades Include hidden grades.
+     * @param bool $showonlyactiveenrol Whether to only include active enrolments.
      * @return array Ungraded grade items counts with report preferences.
      */
-    public function ungraded_counts(): array {
+    public function ungraded_counts(bool $grouponly = false, bool $includehiddengrades = false, $showonlyactiveenrol = true): array {
         global $DB;
 
         $groupid = null;
-        if (isset($this->gpr->groupid)) {
+        if ($grouponly && isset($this->gpr->groupid)) {
             $groupid = $this->gpr->groupid;
         }
 
@@ -831,20 +853,20 @@ abstract class grade_report {
         list($gradebookrolessql, $gradebookrolesparams) =
             $DB->get_in_or_equal(explode(',', $this->gradebookroles), SQL_PARAMS_NAMED, 'grbr0');
 
-        // Limit to users with an active enrolment.
-        $defaultgradeshowactiveenrol = !empty($CFG->grade_report_showonlyactiveenrol);
-        $showonlyactiveenrol = get_user_preferences('grade_report_showonlyactiveenrol', $defaultgradeshowactiveenrol);
-        $showonlyactiveenrol = $showonlyactiveenrol ||
-            !has_capability('moodle/course:viewsuspendedusers', $this->context);
         list($enrolledsql, $enrolledparams) = get_enrolled_sql($this->context, '', 0, $showonlyactiveenrol);
 
         $params = array_merge($this->groupwheresql_params, $gradebookrolesparams, $enrolledparams, $relatedctxparams);
         $params['courseid'] = $this->courseid;
 
-        // Aggregate on whole course only.
         if (empty($groupid)) {
+            // Aggregate on whole course only.
             $this->groupsql = null;
             $this->groupwheresql = null;
+        }
+
+        $includesql = '';
+        if (!$includehiddengrades) {
+            $includesql = 'AND gg.hidden = 0';
         }
 
         // Empty grades must be evaluated as grademin, NOT always 0.
@@ -863,7 +885,7 @@ abstract class grade_report {
                                   AND ra.contextid $relatedctxsql
                            ) rainner ON rainner.userid = u.id
                       LEFT JOIN {grade_grades} gg
-                             ON (gg.itemid = gi.id AND gg.userid = u.id AND gg.finalgrade IS NOT NULL AND gg.hidden = 0)
+                             ON (gg.itemid = gi.id AND gg.userid = u.id AND gg.finalgrade IS NOT NULL $includesql)
                       $this->groupsql
                      WHERE gi.courseid = :courseid
                            AND gg.finalgrade IS NULL
@@ -887,7 +909,7 @@ abstract class grade_report {
                      WHERE gi.courseid = :courseid
                        AND u.deleted = 0
                        AND gg.finalgrade IS NOT NULL
-                       AND gg.hidden = 0
+                       $includesql
                        $this->groupwheresql
                   GROUP BY gg.itemid";
 
@@ -952,5 +974,68 @@ abstract class grade_report {
         return get_gradable_users($courseid, $groupid, $onlyactiveenrol);
     }
 
-}
+    /**
+     * Returns a row of grade items averages
+     *
+     * @param array $ungradedcounts Ungraded grade items counts with report preferences.
+     * @return html_table_row Row with averages
+     */
+    protected function format_averages(array $ungradedcounts): html_table_row {
 
+        $avgrow = new html_table_row();
+        $avgrow->attributes['class'] = 'avg';
+
+        $averagesdisplaytype = $ungradedcounts['report']['averagesdisplaytype'];
+        $averagesdecimalpoints = $ungradedcounts['report']['averagesdecimalpoints'];
+        $shownumberofgrades = $ungradedcounts['report']['shownumberofgrades'];
+
+        foreach ($this->gtree->items as $gradeitem) {
+            if ($gradeitem->needsupdate) {
+                $avgrow->cells[$gradeitem->id] = $this->format_average_cell($gradeitem);
+            } else {
+                $aggr = $this->calculate_average($gradeitem, $ungradedcounts);
+
+                if (empty($aggr['average'])) {
+                    $avgrow->cells[$gradeitem->id] =
+                        $this->format_average_cell($gradeitem, $aggr, $ungradedcounts['report']['shownumberofgrades']);
+                } else {
+                    // Determine which display type to use for this average.
+                    if (isset($USER->editing) && $USER->editing) {
+                        $displaytype = GRADE_DISPLAY_TYPE_REAL;
+                    } else if ($averagesdisplaytype == GRADE_REPORT_PREFERENCE_INHERIT) {
+                        // No ==0 here, please resave the report and user preferences.
+                        $displaytype = $gradeitem->get_displaytype();
+                    } else {
+                        $displaytype = $averagesdisplaytype;
+                    }
+
+                    // Override grade_item setting if a display preference (not inherit) was set for the averages.
+                    if ($averagesdecimalpoints == GRADE_REPORT_PREFERENCE_INHERIT) {
+                        $decimalpoints = $gradeitem->get_decimals();
+                    } else {
+                        $decimalpoints = $averagesdecimalpoints;
+                    }
+
+                    $aggr['average'] = grade_format_gradevalue($aggr['average'],
+                        $gradeitem, true, $displaytype, $decimalpoints);
+
+                    $avgrow->cells[$gradeitem->id] = $this->format_average_cell($gradeitem, $aggr, $shownumberofgrades);
+                }
+            }
+        }
+        return $avgrow;
+    }
+
+    /**
+     * Returns a row of grade items averages. Override this method to change the format of the average cell.
+     *
+     * @param grade_item $gradeitem Grade item.
+     * @param array|null $aggr Average value and meancount information.
+     * @param bool|null $shownumberofgrades Whether to show number of grades.
+     * @return html_table_cell table cell.
+     */
+    protected function format_average_cell(grade_item $gradeitem, ?array $aggr = null, ?bool $shownumberofgrades = null): html_table_cell {
+        return new html_table_cell();
+    }
+
+}

@@ -35,13 +35,19 @@ require_once($CFG->libdir . '/completionlib.php');
 require_once($CFG->libdir . '/filelib.php');
 require_once($CFG->libdir . '/questionlib.php');
 
+use core\di;
+use core\hook;
+use core_question\local\bank\condition;
 use mod_quiz\access_manager;
 use mod_quiz\event\attempt_submitted;
 use mod_quiz\grade_calculator;
+use mod_quiz\hook\attempt_state_changed;
+use mod_quiz\local\override_manager;
 use mod_quiz\question\bank\qbank_helper;
 use mod_quiz\question\display_options;
 use mod_quiz\quiz_attempt;
 use mod_quiz\quiz_settings;
+use mod_quiz\structure;
 use qbank_previewquestion\question_preview_options;
 
 /**
@@ -143,6 +149,8 @@ function quiz_create_attempt(quiz_settings $quizobj, $attemptnumber, $lastattemp
         $attempt->timecheckstate = $timeclose;
     }
 
+    di::get(hook\manager::class)->dispatch(new attempt_state_changed(null, $attempt));
+
     return $attempt;
 }
 /**
@@ -167,9 +175,8 @@ function quiz_start_new_attempt($quizobj, $quba, $attempt, $attemptnumber, $time
     $qubaids = new \mod_quiz\question\qubaids_for_users_attempts(
             $quizobj->get_quizid(), $attempt->userid);
 
-    // Fully load all the questions in this quiz.
+    // Partially load all the questions in this quiz.
     $quizobj->preload_questions();
-    $quizobj->load_questions();
 
     // First load all the non-random questions.
     $randomfound = false;
@@ -177,7 +184,7 @@ function quiz_start_new_attempt($quizobj, $quba, $attempt, $attemptnumber, $time
     $questions = [];
     $maxmark = [];
     $page = [];
-    foreach ($quizobj->get_questions() as $questiondata) {
+    foreach ($quizobj->get_questions(null, false) as $questiondata) {
         $slot += 1;
         $maxmark[$slot] = $questiondata->maxmark;
         $page[$slot] = $questiondata->page;
@@ -188,10 +195,7 @@ function quiz_start_new_attempt($quizobj, $quba, $attempt, $attemptnumber, $time
             $randomfound = true;
             continue;
         }
-        if (!$quizobj->get_quiz()->shuffleanswers) {
-            $questiondata->options->shuffleanswers = false;
-        }
-        $questions[$slot] = question_bank::make_question($questiondata);
+        $questions[$slot] = question_bank::load_question($questiondata->questionid, $quizobj->get_quiz()->shuffleanswers);
     }
 
     // Then find a question to go in place of each random question.
@@ -207,7 +211,7 @@ function quiz_start_new_attempt($quizobj, $quba, $attempt, $attemptnumber, $time
         }
         $randomloader = new \core_question\local\bank\random_question_loader($qubaids, $usedquestionids);
 
-        foreach ($quizobj->get_questions() as $questiondata) {
+        foreach ($quizobj->get_questions(null, false) as $questiondata) {
             $slot += 1;
             if ($questiondata->qtype != 'random') {
                 continue;
@@ -217,8 +221,9 @@ function quiz_start_new_attempt($quizobj, $quba, $attempt, $attemptnumber, $time
 
             // Deal with fixed random choices for testing.
             if (isset($questionids[$quba->next_slot_number()])) {
-                if ($randomloader->is_question_available($questiondata->category,
-                        (bool) $questiondata->questiontext, $questionids[$quba->next_slot_number()], $tagids)) {
+                $filtercondition = $questiondata->filtercondition;
+                $filters = $filtercondition['filter'] ?? [];
+                if ($randomloader->is_filtered_question_available($filters, $questionids[$quba->next_slot_number()])) {
                     $questions[$slot] = question_bank::load_question(
                             $questionids[$quba->next_slot_number()], $quizobj->get_quiz()->shuffleanswers);
                     continue;
@@ -228,8 +233,10 @@ function quiz_start_new_attempt($quizobj, $quba, $attempt, $attemptnumber, $time
             }
 
             // Normal case, pick one at random.
-            $questionid = $randomloader->get_next_question_id($questiondata->category,
-                    $questiondata->randomrecurse, $tagids);
+            $filtercondition = $questiondata->filtercondition;
+            $filters = $filtercondition['filter'] ?? [];
+            $questionid = $randomloader->get_next_filtered_question_id($filters);
+
             if ($questionid === null) {
                 throw new moodle_exception('notenoughrandomquestions', 'quiz',
                                            $quizobj->view_url(), $questiondata);
@@ -447,10 +454,14 @@ function quiz_delete_attempt($attempt, $quiz) {
         $event->add_record_snapshot('quiz_attempts', $attempt);
         $event->trigger();
 
+        // This class callback is deprecated, and will be removed in Moodle 4.8 (MDL-80327).
+        // Use the attempt_state_changed hook instead.
         $callbackclasses = \core_component::get_plugin_list_with_class('quiz', 'quiz_attempt_deleted');
         foreach ($callbackclasses as $callbackclass) {
-            component_class_callback($callbackclass, 'callback', [$quiz->id]);
+            component_class_callback($callbackclass, 'callback', [$quiz->id], null, true);
         }
+
+        di::get(hook\manager::class)->dispatch(new attempt_state_changed($attempt, null));
     }
 
     // Search quiz_attempts for other instances by this user.
@@ -1584,28 +1595,11 @@ function quiz_send_notify_manual_graded_message(quiz_attempt $attemptobj, object
  * @return void
  */
 function quiz_process_group_deleted_in_course($courseid) {
-    global $DB;
+    $affectedquizzes = override_manager::delete_orphaned_group_overrides_in_course($courseid);
 
-    // It would be nice if we got the groupid that was deleted.
-    // Instead, we just update all quizzes with orphaned group overrides.
-    $sql = "SELECT o.id, o.quiz, o.groupid
-              FROM {quiz_overrides} o
-              JOIN {quiz} quiz ON quiz.id = o.quiz
-         LEFT JOIN {groups} grp ON grp.id = o.groupid
-             WHERE quiz.course = :courseid
-               AND o.groupid IS NOT NULL
-               AND grp.id IS NULL";
-    $params = ['courseid' => $courseid];
-    $records = $DB->get_records_sql($sql, $params);
-    if (!$records) {
-        return; // Nothing to do.
+    if (!empty($affectedquizzes)) {
+        quiz_update_open_attempts(['quizid' => $affectedquizzes]);
     }
-    $DB->delete_records_list('quiz_overrides', 'id', array_keys($records));
-    $cache = cache::make('mod_quiz', 'overrides');
-    foreach ($records as $record) {
-        $cache->delete("{$record->quiz}_g_{$record->groupid}");
-    }
-    quiz_update_open_attempts(['quizid' => array_unique(array_column($records, 'quiz'))]);
 }
 
 /**
@@ -1626,6 +1620,8 @@ function quiz_get_js_module() {
             ['functiondisabledbysecuremode', 'quiz'],
             ['startattempt', 'quiz'],
             ['timesup', 'quiz'],
+            ['show', 'moodle'],
+            ['hide', 'moodle'],
         ],
     ];
 }
@@ -1659,7 +1655,7 @@ function quiz_question_tostring($question, $showicon = false, $showquestiontext 
     if ($showidnumber && $question->idnumber !== null && $question->idnumber !== '') {
         $result .= ' ' . html_writer::span(
                 html_writer::span(get_string('idnumber', 'question'), 'accesshide') .
-                ' ' . s($question->idnumber), 'badge badge-primary');
+                ' ' . s($question->idnumber), 'badge bg-primary text-white');
     }
 
     // Question tags.
@@ -1893,54 +1889,26 @@ function quiz_update_section_firstslots($quizid, $direction, $afterslot, $before
  * @param int $addonpage the page on which to add the question.
  * @param int $categoryid the question category to add the question from.
  * @param int $number the number of random questions to add.
- * @param bool $includesubcategories whether to include questoins from subcategories.
- * @param int[] $tagids Array of tagids. The question that will be picked randomly should be tagged with all these tags.
+ * @deprecated Since Moodle 4.3 MDL-72321
+ * @todo Final deprecation in Moodle 4.7 MDL-78091
  */
-function quiz_add_random_questions($quiz, $addonpage, $categoryid, $number,
-        $includesubcategories, $tagids = []) {
-    global $DB;
+function quiz_add_random_questions(stdClass $quiz, int $addonpage, int $categoryid, int $number): void {
+    debugging(
+        'quiz_add_random_questions is deprecated. Please use mod_quiz\structure::add_random_questions() instead.',
+        DEBUG_DEVELOPER
+    );
 
-    $category = $DB->get_record('question_categories', ['id' => $categoryid]);
-    if (!$category) {
-        new moodle_exception('invalidcategoryid');
-    }
-
-    $catcontext = context::instance_by_id($category->contextid);
-    require_capability('moodle/question:useall', $catcontext);
-
-    // Tags for filter condition.
-    $tags = \core_tag_tag::get_bulk($tagids, 'id, name');
-    $tagstrings = [];
-    foreach ($tags as $tag) {
-        $tagstrings[] = "{$tag->id},{$tag->name}";
-    }
-    // Create the selected number of random questions.
-    for ($i = 0; $i < $number; $i++) {
-        // Set the filter conditions.
-        $filtercondition = new stdClass();
-        $filtercondition->questioncategoryid = $categoryid;
-        $filtercondition->includingsubcategories = $includesubcategories ? 1 : 0;
-        if (!empty($tagstrings)) {
-            $filtercondition->tags = $tagstrings;
-        }
-
-        if (!isset($quiz->cmid)) {
-            $cm = get_coursemodule_from_instance('quiz', $quiz->id, $quiz->course);
-            $quiz->cmid = $cm->id;
-        }
-
-        // Slot data.
-        $randomslotdata = new stdClass();
-        $randomslotdata->quizid = $quiz->id;
-        $randomslotdata->usingcontextid = context_module::instance($quiz->cmid)->id;
-        $randomslotdata->questionscontextid = $category->contextid;
-        $randomslotdata->maxmark = 1;
-
-        $randomslot = new \mod_quiz\local\structure\slot_random($randomslotdata);
-        $randomslot->set_quiz($quiz);
-        $randomslot->set_filter_condition($filtercondition);
-        $randomslot->insert($addonpage);
-    }
+    $settings = quiz_settings::create($quiz->id);
+    $structure = structure::create_for_quiz($settings);
+    $structure->add_random_questions($addonpage, $number, [
+        'filter' => [
+            'category' => [
+                'jointype' => condition::JOINTYPE_DEFAULT,
+                'values' => [$categoryid],
+                'filteroptions' => ['includesubcategories' => false],
+            ],
+        ],
+    ]);
 }
 
 /**

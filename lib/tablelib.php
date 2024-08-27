@@ -51,6 +51,7 @@ define('TABLE_P_BOTTOM', 2);
  */
 define('TABLE_SHOW_ALL_PAGE_SIZE', 5000);
 
+use core\dataformat;
 use core_table\local\filter\filterset;
 
 /**
@@ -79,6 +80,12 @@ class flexible_table {
     var $column_suppress = array();
     var $column_nosort   = array('userpic');
     private $column_textsort = array();
+
+    /**
+     * @var array The sticky attribute of each table column.
+     */
+    protected $columnsticky = [];
+
     /** @var boolean Stores if setup has already been called on this flixible table. */
     var $setup           = false;
     var $baseurl         = NULL;
@@ -441,6 +448,17 @@ class flexible_table {
     }
 
     /**
+     * Sets a sticky attribute to a column.
+     * @param string $column Column name
+     * @param bool $sticky
+     */
+    public function column_sticky(string $column, bool $sticky = true): void {
+        if (isset($this->columnsticky[$column])) {
+            $this->columnsticky[$column] = $sticky == true ? ' sticky-column' : '';
+        }
+    }
+
+    /**
      * Sets the given $attributes to $this->columnsattributes.
      * Column attributes will be added to every cell in the column.
      *
@@ -478,6 +496,7 @@ class flexible_table {
         $this->columns = array();
         $this->column_style = array();
         $this->column_class = array();
+        $this->columnsticky = [];
         $this->columnsattributes = [];
         $colnum = 0;
 
@@ -485,6 +504,7 @@ class flexible_table {
             $this->columns[$column]         = $colnum++;
             $this->column_style[$column]    = array();
             $this->column_class[$column]    = '';
+            $this->columnsticky[$column]    = '';
             $this->columnsattributes[$column] = [];
             $this->column_suppress[$column] = false;
         }
@@ -685,7 +705,7 @@ class flexible_table {
     }
 
     /**
-     * @return string sql to add to where statement.
+     * @return array sql to add to where statement.
      */
     function get_sql_where() {
         global $DB;
@@ -914,9 +934,6 @@ class flexible_table {
             if (!isset($options->newlines)) {
                 $options->newlines = false;
             }
-            if (!isset($options->smiley)) {
-                $options->smiley = false;
-            }
             if (!isset($options->filter)) {
                 $options->filter = false;
             }
@@ -1033,7 +1050,7 @@ class flexible_table {
 
         $this->print_initials_bar();
 
-        echo $OUTPUT->heading(get_string('nothingtodisplay'));
+        echo $OUTPUT->notification(get_string('nothingtodisplay'), 'info', false);
 
         // Render the dynamic table footer.
         echo $this->get_dynamic_table_html_end();
@@ -1160,7 +1177,7 @@ class flexible_table {
             }
 
             $attributes = [
-                'class' => "cell c{$index}" . $this->column_class[$column],
+                'class' => "cell c{$index}" . $this->column_class[$column] . $this->columnsticky[$column],
                 'id' => "{$rowid}_c{$index}",
                 'style' => $this->make_styles_string($this->column_style[$column]),
             ];
@@ -1342,7 +1359,7 @@ class flexible_table {
             }
 
             $attributes = array(
-                'class' => 'header c' . $index . $this->column_class[$column],
+                'class' => 'header c' . $index . $this->column_class[$column] . $this->columnsticky[$column],
                 'scope' => 'col',
             );
             if ($this->headers[$index] === NULL) {
@@ -2048,6 +2065,8 @@ class table_sql extends flexible_table {
     }
 
     /**
+     * Build the table from the fetched data.
+     *
      * Take the data returned from the db_query and go through all the rows
      * processing each col using either col_{columnname} method or other_cols
      * method or if other_cols returns NULL then put the data straight into the
@@ -2056,18 +2075,13 @@ class table_sql extends flexible_table {
      * After calling this function, don't forget to call close_recordset.
      */
     public function build_table() {
-
-        if ($this->rawdata instanceof \Traversable && !$this->rawdata->valid()) {
-            return;
-        }
         if (!$this->rawdata) {
             return;
         }
 
         foreach ($this->rawdata as $row) {
             $formattedrow = $this->format_row($row);
-            $this->add_data_keyed($formattedrow,
-                $this->get_row_class($row));
+            $this->add_data_keyed($formattedrow, $this->get_row_class($row));
         }
     }
 
@@ -2302,11 +2316,7 @@ class table_dataformat_export_format extends table_default_export_format_parent 
             throw new coding_exception("Output can not be buffered before instantiating table_dataformat_export_format");
         }
 
-        $classname = 'dataformat_' . $dataformat . '\writer';
-        if (!class_exists($classname)) {
-            throw new coding_exception("Unable to locate dataformat/$dataformat/classes/writer.php");
-        }
-        $this->dataformat = new $classname;
+        $this->dataformat = dataformat::get_format_instance($dataformat);
 
         // The dataformat export time to first byte could take a while to generate...
         set_time_limit(0);

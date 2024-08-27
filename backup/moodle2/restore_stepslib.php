@@ -1159,7 +1159,10 @@ class restore_groups_structure_step extends restore_structure_step {
         $groupinfo = $this->get_setting_value('groups');
         if ($groupinfo) {
             $paths[] = new restore_path_element('group', '/groups/group');
+            $paths[] = new restore_path_element('groupcustomfield', '/groups/groupcustomfields/groupcustomfield');
             $paths[] = new restore_path_element('grouping', '/groups/groupings/grouping');
+            $paths[] = new restore_path_element('groupingcustomfield',
+                '/groups/groupings/groupingcustomfields/groupingcustomfield');
             $paths[] = new restore_path_element('grouping_group', '/groups/groupings/grouping/grouping_groups/grouping_group');
         }
         return $paths;
@@ -1225,6 +1228,18 @@ class restore_groups_structure_step extends restore_structure_step {
         cache_helper::invalidate_by_definition('core', 'groupdata', array(), array($data->courseid));
     }
 
+    /**
+     * Restore group custom field values.
+     * @param array $data data for group custom field
+     * @return void
+     */
+    public function process_groupcustomfield($data) {
+        $newgroup = $this->get_mapping('group', $data['groupid']);
+        $data['groupid'] = $newgroup->newitemid ?? $data['groupid'];
+        $handler = \core_group\customfield\group_handler::create();
+        $handler->restore_instance_data_from_backup($this->task, $data);
+    }
+
     public function process_grouping($data) {
         global $DB;
 
@@ -1268,6 +1283,18 @@ class restore_groups_structure_step extends restore_structure_step {
         $this->set_mapping('grouping', $oldid, $newitemid, $restorefiles);
         // Invalidate the course group data cache just in case.
         cache_helper::invalidate_by_definition('core', 'groupdata', array(), array($data->courseid));
+    }
+
+    /**
+     * Restore grouping custom field values.
+     * @param array $data data for grouping custom field
+     * @return void
+     */
+    public function process_groupingcustomfield($data) {
+        $newgroup = $this->get_mapping('grouping', $data['groupingid']);
+        $data['groupingid'] = $newgroup->newitemid ?? $data['groupingid'];
+        $handler = \core_group\customfield\grouping_handler::create();
+        $handler->restore_instance_data_from_backup($this->task, $data);
     }
 
     public function process_grouping_group($data) {
@@ -1602,6 +1629,11 @@ class restore_section_structure_step extends restore_structure_step {
                             $data, true);
                 }
             }
+            // Moodle 4.4 implement basic delegated section logic but it is not able to restore
+            // them from a backup. To prevent unexpected retoration errors, all sections with
+            // a component will be restored as a normal section.
+            $section->component = null;
+            $section->itemid = null;
             $newitemid = $DB->insert_record('course_sections', $section);
             $section->id = $newitemid;
 
@@ -1981,7 +2013,11 @@ class restore_course_structure_step extends restore_structure_step {
      */
     public function process_customfield($data) {
         $handler = core_course\customfield\course_handler::create();
-        $handler->restore_instance_data_from_backup($this->task, $data);
+        $newid = $handler->restore_instance_data_from_backup($this->task, $data);
+
+        if ($newid) {
+            $handler->restore_define_structure($this, $newid, $data['id']);
+        }
     }
 
     /**
@@ -1991,7 +2027,7 @@ class restore_course_structure_step extends restore_structure_step {
      * @throws base_step_exception
      * @throws dml_exception
      */
-    public function process_course_format_option(array $data) : void {
+    public function process_course_format_option(array $data): void {
         global $DB;
 
         if ($data['sectionid']) {
@@ -2621,6 +2657,7 @@ class restore_badges_structure_step extends restore_structure_step {
         $paths[] = new restore_path_element('alignment', '/badges/badge/alignments/alignment');
         $paths[] = new restore_path_element('relatedbadge', '/badges/badge/relatedbadges/relatedbadge');
         $paths[] = new restore_path_element('manual_award', '/badges/badge/manual_awards/manual_award');
+        $paths[] = new restore_path_element('tag', '/badges/badge/tags/tag');
 
         return $paths;
     }
@@ -2827,6 +2864,22 @@ class restore_badges_structure_step extends restore_structure_step {
             }
 
             $DB->insert_record('badge_manual_award', $award);
+        }
+    }
+
+    /**
+     * Process tag.
+     *
+     * @param array $data The data.
+     * @throws base_step_exception
+     */
+    public function process_tag(array $data): void {
+        $data = (object)$data;
+        $badgeid = $this->get_new_parentid('badge');
+
+        if (!empty($data->rawname)) {
+            core_tag_tag::add_item_tag('core_badges', 'badge', $badgeid,
+                context_course::instance($this->get_courseid()), $data->rawname);
         }
     }
 
@@ -3749,7 +3802,7 @@ class restore_activity_competencies_structure_step extends restore_structure_ste
             // Sortorder is ignored by precaution, anyway we should walk through the records in the right order.
             $record = (object) $params;
             $record->ruleoutcome = $data->ruleoutcome;
-            $record->overridegrade = $data->overridegrade;
+            $record->overridegrade = $data->overridegrade ?? 0;
             $coursemodulecompetency = new \core_competency\course_module_competency(0, $record);
             $coursemodulecompetency->create();
         }
@@ -5390,6 +5443,25 @@ class restore_move_module_questions_categories extends restore_execution_step {
                     ];
                     $params += $categoryidparams;
                     $DB->execute($sqlupdate, $params);
+
+                    // As explained in {@see restore_quiz_activity_structure_step::process_quiz_question_legacy_instance()}
+                    // question_set_references relating to random questions restored from old backups,
+                    // which pick from context_module question_categores, will have been restored with the wrong questioncontextid.
+                    // So, now, we need to find those, and updated the questioncontextid.
+                    // We can only find them by picking apart the filter conditions, and seeign which categories they refer to.
+
+                    // We need to check all the question_set_references belonging to this context_module.
+                    $references = $DB->get_records('question_set_references', ['usingcontextid' => $newcontext->newitemid]);
+                    foreach ($references as $reference) {
+                        $filtercondition = json_decode($reference->filtercondition);
+                        if (!empty($filtercondition->questioncategoryid) &&
+                                in_array($filtercondition->questioncategoryid, $categoryids)) {
+                            // This is one of ours, update the questionscontextid.
+                            $DB->set_field('question_set_references',
+                                'questionscontextid', $newcontext->newitemid,
+                                ['id' => $reference->id]);
+                        }
+                    }
                 }
 
                 // Now set the parent id for the question categories that were in the top category in the course context
@@ -6180,14 +6252,34 @@ trait restore_question_set_reference_data_trait {
         $data = (object) $data;
         $data->usingcontextid = $this->get_mappingid('context', $data->usingcontextid);
         $data->itemid = $this->get_new_parentid('quiz_question_instance');
-        $filtercondition = json_decode($data->filtercondition);
-        if ($category = $this->get_mappingid('question_category', $filtercondition->questioncategoryid)) {
-            $filtercondition->questioncategoryid = $category;
+        $filtercondition = json_decode($data->filtercondition, true);
+
+        if (!isset($filtercondition['filter'])) {
+            // Pre-4.3, convert the old filtercondition format to the new format.
+            $filtercondition = \core_question\question_reference_manager::convert_legacy_set_reference_filter_condition(
+                    $filtercondition);
         }
-        $data->filtercondition = json_encode($filtercondition);
+
+        // Map category id used for category filter condition and corresponding context id.
+        $oldcategoryid = $filtercondition['filter']['category']['values'][0];
+        $newcategoryid = $this->get_mappingid('question_category', $oldcategoryid);
+        $filtercondition['filter']['category']['values'][0] = $newcategoryid;
+
         if ($context = $this->get_mappingid('context', $data->questionscontextid)) {
             $data->questionscontextid = $context;
+        } else {
+            $this->log('question_set_reference with old id ' . $data->id .
+                ' referenced question context ' . $data->questionscontextid .
+                ' which was not included in the backup. Therefore, this has been ' .
+                ' restored with the old questionscontextid.', backup::LOG_WARNING);
         }
+
+        $filtercondition['cat'] = implode(',', [
+            $filtercondition['filter']['category']['values'][0],
+            $data->questionscontextid,
+        ]);
+
+        $data->filtercondition = json_encode($filtercondition);
 
         $DB->insert_record('question_set_references', $data);
     }

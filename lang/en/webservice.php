@@ -191,11 +191,16 @@ $string['testwithtestclient'] = 'Test the service';
 $string['testwithtestclientdescription'] = 'Simulate external access to the service using the web service test client. Use an enabled protocol with token authentication. <strong>WARNING: The functions that you test WILL BE EXECUTED, so be careful what you choose to test!</strong>';
 $string['token'] = 'Token';
 $string['tokenauthlog'] = 'Token authentication';
+$string['tokencopied'] = 'Text copied to clipboard.';
 $string['tokencreatedbyadmin'] = 'Can only be reset by administrator (*)';
 $string['tokencreator'] = 'Creator';
 $string['tokenfilter'] = 'Tokens filter';
 $string['tokenfiltersubmit'] = 'Show only matching tokens';
 $string['tokenfilterreset'] = 'Show all tokens';
+$string['tokenname'] = 'Name';
+$string['tokennamehint'] = 'If you don\'t enter a name then a random name will be used.';
+$string['tokennameprefix'] = 'Webservice-{$a}';
+$string['tokennewmessage'] = 'Copy the token now. It won\'t be shown again once you leave this page.';
 $string['unknownoptionkey'] = 'Unknown option key ({$a})';
 $string['unnamedstringparam'] = 'A string parameter is unnamed.';
 $string['updateusersettings'] = 'Update';
@@ -210,6 +215,7 @@ $string['usernotallowed'] = 'The user is not allowed for this service. First you
 $string['userservices'] = 'User services: {$a}';
 $string['usersettingssaved'] = 'User settings saved';
 $string['validuntil'] = 'Valid until';
+$string['validuntil_empty'] = 'This token has no expiry date.';
 $string['validuntil_help'] = 'If set, the service will be inactivated after this date for this user.';
 $string['webservice'] = 'Web service';
 $string['webservices'] = 'Web services';
@@ -230,9 +236,6 @@ $string['wsdocumentationlogin'] = 'or enter your web service username and passwo
 $string['wspassword'] = 'Web service password';
 $string['wsusername'] = 'Web service username';
 
-// Deprecated since Moodle 3.11.
-$string['usernameoridnousererror'] = 'No users were found with this username/user id.';
-$string['usernameoridoccurenceerror'] = 'More than one user was found with this username. Please enter the user id.';
 // Deprecated since Moodle 4.2.
 $string['missingversionfile'] = 'Coding error: version.php file is missing for the component {$a}';
 $string['cannotgetcoursecontents'] = 'Cannot get course contents';

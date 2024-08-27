@@ -42,6 +42,10 @@ class behat_grades extends behat_base {
                 'grade_actions',
                 ["//td[count(//table[@id='user-grades']//th[contains(., %locator%)]/preceding-sibling::th)]//*[@data-type='grade']"]
             ),
+            new behat_component_named_selector(
+                'gradeitem modal',
+                [".//*[contains(concat(' ', @class, ' '), ' modal ')]"]
+            ),
         ];
     }
 
@@ -132,8 +136,13 @@ class behat_grades extends behat_base {
     public function i_select_in_the($value, $element, $selectortype) {
         // Getting the container where the text should be found.
         $container = $this->get_selected_node($selectortype, $element);
-        $node = $this->find('xpath', './/input[@value="' . $value . '"]', false, $container);
-        $node->click();
+        if ($this->getSession()->getPage()->find('xpath', './/input[@value="' . $value . '"]')) {
+            $node = $this->find('xpath', './/input[@value="' . $value . '"]', false, $container);
+            $node->click();
+        } else {
+            $node = $this->find('xpath', './/button[@data-action="' . strtolower($value) . '"]', false, $container);
+            $node->press();
+        }
     }
 
     /**
@@ -228,7 +237,7 @@ class behat_grades extends behat_base {
      * @throws Exception
      */
     public function i_click_on_grade_item_menu(string $itemname, string $itemtype, string $page) {
-
+        $this->execute("behat_navigation::i_close_block_drawer_if_open");
         if ($itemtype == 'gradeitem') {
             $itemid = $this->get_grade_item_id($itemname);
         } else if ($itemtype == 'category') {
@@ -256,6 +265,8 @@ class behat_grades extends behat_base {
         } else {
             throw new Exception('Unknown page: ' . $page);
         }
+        $node = $this->get_selected_node("xpath_element", $this->escape($xpath));
+        $this->execute_js_on_node($node, '{{ELEMENT}}.scrollIntoView({ block: "center", inline: "center" })');
         $this->execute("behat_general::i_click_on", [$this->escape($xpath), "xpath_element"]);
     }
 }

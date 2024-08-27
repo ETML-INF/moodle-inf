@@ -59,7 +59,7 @@ class lib_test extends \advanced_testcase {
     /**
      * Test init_service_class().
      */
-    public function test_init_service_class() {
+    public function test_init_service_class(): void {
         global $DB, $USER;
 
         $this->resetAfterTest(true);
@@ -87,6 +87,7 @@ class lib_test extends \advanced_testcase {
         $externaltoken->contextid = 1;
         $externaltoken->creatorid = $USER->id;
         $externaltoken->timecreated = time();
+        $externaltoken->name = \core_external\util::generate_token_name();
         $DB->insert_record('external_tokens', $externaltoken);
 
         // Add a function to the service.
@@ -147,7 +148,7 @@ class lib_test extends \advanced_testcase {
     /**
      * Tests update_token_lastaccess() function.
      */
-    public function test_update_token_lastaccess() {
+    public function test_update_token_lastaccess(): void {
         global $DB, $USER;
 
         $this->resetAfterTest(true);
@@ -207,7 +208,7 @@ class lib_test extends \advanced_testcase {
     /**
      * Tests for the {@see webservice::get_missing_capabilities_by_users()} implementation.
      */
-    public function test_get_missing_capabilities_by_users() {
+    public function test_get_missing_capabilities_by_users(): void {
         global $DB;
 
         $this->resetAfterTest(true);

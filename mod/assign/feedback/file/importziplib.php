@@ -121,7 +121,7 @@ class assignfeedback_file_zip_importer {
      * Does this file exist in any of the current files supported by this plugin for this user?
      *
      * @param assign $assignment - The assignment instance
-     * @param array $users The user matching this uploaded file
+     * @param array|stdClass $users The user(s) matching this uploaded file
      * @param assign_plugin $plugin The matching plugin from the filename
      * @param string $filename The parsed filename from the zip
      * @param stored_file $fileinfo The info about the extracted file from the zip
@@ -130,7 +130,11 @@ class assignfeedback_file_zip_importer {
     public function is_file_modified($assignment, $users, $plugin, $filename, $fileinfo) {
         $sg = null;
 
-        $user = $users[0];
+        if (is_array($users)) {
+            $user = $users[0];
+        } else {
+            $user = $users;
+        }
 
         if ($plugin->get_subtype() == 'assignsubmission') {
             if ($assignment->get_instance()->teamsubmission) {

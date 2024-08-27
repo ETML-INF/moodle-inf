@@ -45,7 +45,7 @@ use stdClass;
 class quiz_settings {
     /** @var stdClass the course settings from the database. */
     protected $course;
-    /** @var stdClass the course_module settings from the database. */
+    /** @var cm_info the course_module settings from the database. */
     protected $cm;
     /** @var stdClass the quiz settings from the database. */
     protected $quiz;
@@ -64,6 +64,9 @@ class quiz_settings {
     protected $accessmanager = null;
     /** @var bool whether the current user has capability mod/quiz:preview. */
     protected $ispreviewuser = null;
+
+    /** @var grade_calculator|null grade calculator for this quiz. */
+    protected ?grade_calculator $gradecalculator = null;
 
     // Constructor =============================================================.
 
@@ -89,12 +92,12 @@ class quiz_settings {
      * Helper used by the other factory methods.
      *
      * @param stdClass $quiz
-     * @param cm_info|stdClass $cm
+     * @param cm_info $cm
      * @param stdClass $course
      * @param int|null $userid the the userid (optional). If passed, relevant overrides are applied.
      * @return quiz_settings the new quiz settings object.
      */
-    protected static function create_helper(stdClass $quiz, cm_info|stdClass $cm, stdClass $course, ?int $userid): self {
+    protected static function create_helper(stdClass $quiz, cm_info $cm, stdClass $course, ?int $userid): self {
         // Update quiz with override information.
         if ($userid) {
             $quiz = quiz_update_effective_access($quiz, $userid);
@@ -112,8 +115,7 @@ class quiz_settings {
      */
     public static function create(int $quizid, int $userid = null): self {
         $quiz = access_manager::load_quiz_and_settings($quizid);
-        $course = get_course($quiz->course);
-        $cm = get_coursemodule_from_instance('quiz', $quiz->id, $course->id, false, MUST_EXIST);
+        [$course, $cm] = get_course_and_cm_from_instance($quiz, 'quiz');
 
         return self::create_helper($quiz, $cm, $course, $userid);
     }
@@ -266,7 +268,7 @@ class quiz_settings {
     /**
      * Get the course-module object for this quiz.
      *
-     * @return stdClass the course_module object.
+     * @return cm_info the course_module object.
      */
     public function get_cm() {
         return $this->cm;
@@ -338,9 +340,10 @@ class quiz_settings {
      * Get some of the question in this quiz.
      *
      * @param array|null $questionids question ids of the questions to load. null for all.
+     * @param bool $requirequestionfullyloaded Whether to require that a particular question is fully loaded.
      * @return stdClass[] the question data objects.
      */
-    public function get_questions($questionids = null) {
+    public function get_questions(?array $questionids = null, bool $requirequestionfullyloaded = true) {
         if (is_null($questionids)) {
             $questionids = array_keys($this->questions);
         }
@@ -350,7 +353,9 @@ class quiz_settings {
                 throw new moodle_exception('cannotstartmissingquestion', 'quiz', $this->view_url());
             }
             $questions[$id] = $this->questions[$id];
-            $this->ensure_question_loaded($id);
+            if ($requirequestionfullyloaded) {
+                $this->ensure_question_loaded($id);
+            }
         }
         return $questions;
     }
@@ -391,7 +396,11 @@ class quiz_settings {
      * @return grade_calculator
      */
     public function get_grade_calculator(): grade_calculator {
-        return grade_calculator::create($this);
+        if ($this->gradecalculator === null) {
+            $this->gradecalculator = grade_calculator::create($this);
+        }
+
+        return $this->gradecalculator;
     }
 
     /**
@@ -580,18 +589,20 @@ class quiz_settings {
         // To control if we need to look in categories for questions.
         $qcategories = [];
 
-        foreach ($this->get_questions() as $questiondata) {
+        foreach ($this->get_questions(null, false) as $questiondata) {
             if ($questiondata->status == question_version_status::QUESTION_STATUS_DRAFT) {
                 // Skip questions where all versions are draft.
                 continue;
             }
             if ($questiondata->qtype === 'random' && $includepotential) {
-                if (!isset($qcategories[$questiondata->category])) {
-                    $qcategories[$questiondata->category] = false;
-                }
-                if (!empty($questiondata->filtercondition)) {
-                    $filtercondition = json_decode($questiondata->filtercondition);
-                    $qcategories[$questiondata->category] = !empty($filtercondition->includingsubcategories);
+                $filtercondition = $questiondata->filtercondition;
+                if (!empty($filtercondition)) {
+                    $filter = $filtercondition['filter'];
+                    if (isset($filter['category'])) {
+                        foreach ($filter['category']['values'] as $catid) {
+                            $qcategories[$catid] = $filter['category']['filteroptions']['includesubcategories'];
+                        }
+                    }
                 }
             } else {
                 if (!in_array($questiondata->qtype, $questiontypes)) {
@@ -617,5 +628,17 @@ class quiz_settings {
         sort($questiontypes);
 
         return $questiontypes;
+    }
+
+    /**
+     * Returns an override manager instance with context and quiz loaded.
+     *
+     * @return \mod_quiz\local\override_manager
+     */
+    public function get_override_manager(): \mod_quiz\local\override_manager {
+        return new \mod_quiz\local\override_manager(
+            quiz: $this->quiz,
+            context: $this->context
+        );
     }
 }

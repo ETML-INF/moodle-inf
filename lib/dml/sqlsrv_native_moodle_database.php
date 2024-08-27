@@ -680,9 +680,11 @@ class sqlsrv_native_moodle_database extends moodle_database {
      * @return bool
      */
     private function free_result($resource) {
-        if (!is_bool($resource)) { // true/false resources cannot be freed
+        if (!is_bool($resource) && is_resource($resource)) {
+            // We need to make sure that the statement resource is in the correct type before freeing it.
             return sqlsrv_free_stmt($resource);
         }
+        return false;
     }
 
     /**
@@ -1447,9 +1449,7 @@ class sqlsrv_native_moodle_database extends moodle_database {
         return $text;
     }
 
-    public function sql_concat() {
-        $arr = func_get_args();
-
+    public function sql_concat(...$arr) {
         foreach ($arr as $key => $ele) {
             $arr[$key] = $this->sql_cast_to_char($ele);
         }

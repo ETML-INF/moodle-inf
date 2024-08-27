@@ -226,6 +226,12 @@ class mod_assign_mod_form extends moodleform_mod {
         $mform->addHelpButton('markingallocation', 'markingallocation', 'assign');
         $mform->hideIf('markingallocation', 'markingworkflow', 'eq', 0);
 
+        $name = get_string('markinganonymous', 'assign');
+        $mform->addElement('selectyesno', 'markinganonymous', $name);
+        $mform->addHelpButton('markinganonymous', 'markinganonymous', 'assign');
+        $mform->hideIf('markinganonymous', 'markingworkflow', 'eq', 0);
+        $mform->hideIf('markinganonymous', 'blindmarking', 'eq', 0);
+
         $this->standard_coursemodule_elements();
         $this->apply_admin_defaults();
 
@@ -319,10 +325,13 @@ class mod_assign_mod_form extends moodleform_mod {
     public function add_completion_rules() {
         $mform =& $this->_form;
 
-        $mform->addElement('advcheckbox', 'completionsubmit', '', get_string('completionsubmit', 'assign'));
+        $suffix = $this->get_suffix();
+        $completionsubmitel = 'completionsubmit' . $suffix;
+        $mform->addElement('advcheckbox', $completionsubmitel, '', get_string('completionsubmit', 'assign'));
         // Enable this completion rule by default.
-        $mform->setDefault('completionsubmit', 1);
-        return array('completionsubmit');
+        $mform->setDefault($completionsubmitel, 1);
+
+        return [$completionsubmitel];
     }
 
     /**
@@ -332,7 +341,8 @@ class mod_assign_mod_form extends moodleform_mod {
      * @return bool
      */
     public function completion_rule_enabled($data) {
-        return !empty($data['completionsubmit']);
+        $suffix = $this->get_suffix();
+        return !empty($data['completionsubmit' . $suffix]);
     }
 
 }

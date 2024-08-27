@@ -61,6 +61,7 @@ class restore_quiz_activity_structure_step extends restore_questions_activity_st
         // A chance for access subplugings to set up their quiz data.
         $this->add_subplugin_structure('quizaccess', $quiz);
 
+        $paths[] = new restore_path_element('quiz_grade_item', '/activity/quiz/quiz_grade_items/quiz_grade_item');
         $quizquestioninstance = new restore_path_element('quiz_question_instance',
             '/activity/quiz/question_instances/question_instance');
         $paths[] = $quizquestioninstance;
@@ -238,6 +239,15 @@ class restore_quiz_activity_structure_step extends restore_questions_activity_st
                             display_options::AFTER_CLOSE : 0);
         }
 
+        // New setting in 4.3 needs to be set if not in the backup.
+        if (!isset($data->reviewmaxmarks)) {
+            $data->reviewmaxmarks =
+                    display_options::DURING |
+                    display_options::IMMEDIATELY_AFTER |
+                    display_options::LATER_WHILE_OPEN |
+                    display_options::AFTER_CLOSE;
+        }
+
         // The old popup column from from <= 2.1 need to be mapped to
         // the new browsersecurity. See MDL-29627.
         if (!isset($data->browsersecurity)) {
@@ -316,6 +326,21 @@ class restore_quiz_activity_structure_step extends restore_questions_activity_st
     }
 
     /**
+     * Process a quiz grade items.
+     *
+     * @param stdClass|array $data
+     */
+    protected function process_quiz_grade_item($data): void {
+        global $DB;
+
+        $data = (object) $data;
+        $data->quizid = $this->get_new_parentid('quiz');
+        $oldid = $data->id;
+        $newitemid = $DB->insert_record('quiz_grade_items', $data);
+        $this->set_mapping('quiz_grade_item', $oldid, $newitemid, true);
+    }
+
+    /**
      * Process the data for pre 4.0 quiz data where the question_references and question_set_references table introduced.
      *
      * @param stdClass|array $data
@@ -340,12 +365,17 @@ class restore_quiz_activity_structure_step extends restore_questions_activity_st
 
         if ($question->qtype === 'random') {
             // Set reference data.
-            $questionsetreference = new \stdClass();
+            $questionsetreference = new stdClass();
             $questionsetreference->usingcontextid = context_module::instance(get_coursemodule_from_instance(
                 "quiz", $module->id, $module->course)->id)->id;
             $questionsetreference->component = 'mod_quiz';
             $questionsetreference->questionarea = 'slot';
             $questionsetreference->itemid = $data->id;
+            // If, in the orginal quiz that was backed up, this random question was pointing to a
+            // category in the quiz question bank, then (for reasons explained in {@see restore_move_module_questions_categories})
+            // right now, $question->questioncontextid will incorrectly point to the course contextid.
+            // This will get fixed up later in restore_move_module_questions_categories
+            // as part of moving the question categories to the right place.
             $questionsetreference->questionscontextid = $question->questioncontextid;
             $filtercondition = new stdClass();
             $filtercondition->questioncategoryid = $question->category;
@@ -373,7 +403,7 @@ class restore_quiz_activity_structure_step extends restore_questions_activity_st
      * @param stdClass|array $data
      */
     protected function process_quiz_question_instance($data) {
-        global $CFG, $DB;
+        global $DB;
 
         $data = (object)$data;
         $oldid = $data->id;
@@ -410,6 +440,10 @@ class restore_quiz_activity_structure_step extends restore_questions_activity_st
                     $this->get_new_parentid('quiz') . ' but not actually used. ' .
                     'The instance has been ignored.', backup::LOG_INFO);
             return;
+        }
+
+        if (isset($data->quizgradeitemid)) {
+            $data->quizgradeitemid = $this->get_mappingid('quiz_grade_item', $data->quizgradeitemid);
         }
 
         $data->quizid = $this->get_new_parentid('quiz');

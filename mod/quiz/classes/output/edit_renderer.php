@@ -66,7 +66,7 @@ class edit_renderer extends \plugin_renderer_base {
         $output .= html_writer::start_div('mod_quiz-edit-top-controls');
 
         $output .= html_writer::start_div('d-flex justify-content-between flex-wrap mb-1');
-        $output .= html_writer::start_div('d-flex flex-column justify-content-around');
+        $output .= html_writer::start_div('d-flex align-items-center justify-content-around');
         $output .= $this->quiz_information($structure);
         $output .= html_writer::end_tag('div');
         $output .= $this->maximum_grade_input($structure, $pageurl);
@@ -111,11 +111,11 @@ class edit_renderer extends \plugin_renderer_base {
         // Include the contents of any other popups required.
         if ($structure->can_be_edited()) {
             $thiscontext = $contexts->lowest();
-            $this->page->requires->js_call_amd('mod_quiz/quizquestionbank', 'init', [
+            $this->page->requires->js_call_amd('mod_quiz/modal_quiz_question_bank', 'init', [
                 $thiscontext->id
             ]);
 
-            $this->page->requires->js_call_amd('mod_quiz/add_random_question', 'init', [
+            $this->page->requires->js_call_amd('mod_quiz/modal_add_random_question', 'init', [
                 $thiscontext->id,
                 $pagevars['cat'],
                 $pageurl->out_as_local_url(true),
@@ -179,19 +179,19 @@ class edit_renderer extends \plugin_renderer_base {
      */
     public function maximum_grade_input($structure, \moodle_url $pageurl) {
         $output = '';
-        $output .= html_writer::start_div('maxgrade');
+        $output .= html_writer::start_div('maxgrade', ['class' => 'mt-2 mt-sm-0']);
         $output .= html_writer::start_tag('form', ['method' => 'post', 'action' => 'edit.php',
-                'class' => 'quizsavegradesform form-inline']);
-        $output .= html_writer::start_tag('fieldset', ['class' => 'invisiblefieldset']);
+                'class' => 'quizsavegradesform']);
+        $output .= html_writer::start_tag('fieldset', ['class' => 'invisiblefieldset d-flex align-items-center']);
         $output .= html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'sesskey', 'value' => sesskey()]);
         $output .= html_writer::input_hidden_params($pageurl);
         $output .= html_writer::tag('label', get_string('maximumgrade') . ' ',
-                ['for' => 'inputmaxgrade']);
+                ['for' => 'inputmaxgrade', 'class' => 'd-inline-block w-auto mb-0']);
         $output .= html_writer::empty_tag('input', ['type' => 'text', 'id' => 'inputmaxgrade',
                 'name' => 'maxgrade', 'size' => ($structure->get_decimal_places_for_grades() + 2),
                 'value' => $structure->formatted_quiz_grade(),
-                'class' => 'form-control']);
-        $output .= html_writer::empty_tag('input', ['type' => 'submit', 'class' => 'btn btn-secondary ml-1',
+                'class' => 'form-control d-inline-block align-middle w-auto ml-1']);
+        $output .= html_writer::empty_tag('input', ['type' => 'submit', 'class' => 'btn btn-secondary ml-1 d-inline-block w-auto ',
                 'name' => 'savechanges', 'value' => get_string('save', 'quiz')]);
         $output .= html_writer::end_tag('fieldset');
         $output .= html_writer::end_tag('form');
@@ -608,7 +608,6 @@ class edit_renderer extends \plugin_renderer_base {
             return '';
         }
         $menu = new \action_menu();
-        $menu->set_constraint('.mod-quiz-edit-content');
         $trigger = html_writer::tag('span', get_string('add', 'quiz'), ['class' => 'add-menu']);
         $menu->set_menu_trigger($trigger);
         // The menu appears within an absolutely positioned element causing width problems.
@@ -681,7 +680,7 @@ class edit_renderer extends \plugin_renderer_base {
         if ($structure->can_add_random_questions()) {
             $returnurl = new \moodle_url('/mod/quiz/edit.php', ['cmid' => $structure->get_cmid(), 'data-addonpage' => $page]);
             $params = ['returnurl' => $returnurl, 'cmid' => $structure->get_cmid(), 'appendqnumstring' => 'addarandomquestion'];
-            $url = new \moodle_url('/mod/quiz/addrandom.php', $params);
+            $url = new \moodle_url('/mod/quiz/edit.php', $params);
             $icon = new \pix_icon('t/add', $str->addarandomquestion, 'moodle', ['class' => 'iconsmall', 'title' => '']);
             $attributes = ['class' => 'cm-edit-action addarandomquestion', 'data-action' => 'addarandomquestion'];
             if ($page) {
@@ -795,7 +794,7 @@ class edit_renderer extends \plugin_renderer_base {
      * @param int $slot the slot on the page we are outputting.
      * @return string HTML to output.
      */
-    public function get_checkbox_render(structure $structure, int $slot) : string {
+    public function get_checkbox_render(structure $structure, int $slot): string {
         $questionslot = $structure->get_displayed_number_for_slot($slot);
         $checkbox = new \core\output\checkbox_toggleall($this->togglegroup, false,
             [
@@ -817,7 +816,7 @@ class edit_renderer extends \plugin_renderer_base {
      * @param \moodle_url $pageurl the canonical URL of this page.
      * @return string HTML to output.
      */
-    public function get_question_name_for_slot(structure $structure, int $slot, \moodle_url $pageurl) : string {
+    public function get_question_name_for_slot(structure $structure, int $slot, \moodle_url $pageurl): string {
         // Display the link to the question (or do nothing if question has no url).
         if ($structure->get_question_type_for_slot($slot) === 'random') {
             $questionname = $this->random_question($structure, $slot, $pageurl);
@@ -836,7 +835,7 @@ class edit_renderer extends \plugin_renderer_base {
      * @param \moodle_url $pageurl the canonical URL of this page.
      * @return string HTML to output.
      */
-    public function get_action_icon(structure $structure, int $slot, \moodle_url $pageurl) : string {
+    public function get_action_icon(structure $structure, int $slot, \moodle_url $pageurl): string {
         // Action icons.
         $qtype = $structure->get_question_type_for_slot($slot);
         $slotinfo = $structure->get_slot_by_number($slot);
@@ -1035,7 +1034,7 @@ class edit_renderer extends \plugin_renderer_base {
         $namestr = $qtype->local_name();
 
         $icon = $this->pix_icon('icon', $namestr, $qtype->plugin_name(), ['title' => $namestr,
-                'class' => 'activityicon', 'alt' => ' ', 'role' => 'presentation']);
+                'class' => 'activityicon', 'alt' => $namestr]);
 
         $editicon = $this->pix_icon('t/edit', '', 'moodle', ['title' => '']);
 
@@ -1073,14 +1072,12 @@ class edit_renderer extends \plugin_renderer_base {
         $configuretitle = get_string('configurerandomquestion', 'quiz');
         $qtype = \question_bank::get_qtype($question->qtype, false);
         $namestr = $qtype->local_name();
-        $icon = $this->pix_icon('icon', $namestr, $qtype->plugin_name(), ['title' => $namestr,
-                'class' => 'icon activityicon', 'alt' => ' ', 'role' => 'presentation']);
+        $icon = $this->pix_icon('icon', $namestr, $qtype->plugin_name(), ['class' => 'icon activityicon']);
 
         $editicon = $this->pix_icon('t/edit', $configuretitle, 'moodle', ['title' => '']);
         $qbankurlparams = [
             'cmid' => $structure->get_cmid(),
             'cat' => $slot->category . ',' . $slot->contextid,
-            'recurse' => $slot->randomrecurse,
         ];
 
         $slottags = [];
@@ -1236,8 +1233,6 @@ class edit_renderer extends \plugin_renderer_base {
                 'edittitleinstructions',
                 'emptydragdropregion',
                 'hide',
-                'markedthistopic',
-                'markthistopic',
                 'move',
                 'movecontent',
                 'moveleft',

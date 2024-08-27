@@ -22,6 +22,7 @@
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
+use core\output\comboboxsearch;
 use gradereport_singleview\report\singleview;
 
 /**
@@ -44,26 +45,36 @@ class gradereport_singleview_renderer extends plugin_renderer_base {
      * @return string The raw HTML to render.
      */
     public function users_selector(object $course, ?int $userid = null, ?int $groupid = null): string {
+        $resetlink = new moodle_url('/grade/report/singleview/index.php', ['id' => $course->id, 'group' => $groupid ?? 0]);
+        $submitteduserid = optional_param('userid', '', PARAM_INT);
 
-        $data = [
-            'name' => 'userid',
-            'courseid' => $course->id,
-            'groupid' => $groupid ?? 0,
-        ];
-
-        // If a particular user option is selected (not in zero state).
-        if ($userid) { // A single user selected.
-            $user = core_user::get_user($userid);
-            $data['selectedoption'] = [
-                'image' => $this->user_picture($user, ['size' => 40, 'link' => false]),
-                'text' => fullname($user),
-                'additionaltext' => $user->email,
-            ];
-            $data['userid'] = $userid;
+        if ($submitteduserid) {
+            $user = core_user::get_user($submitteduserid);
+            $currentvalue = fullname($user);
+        } else {
+            $currentvalue = '';
         }
 
-        $this->page->requires->js_call_amd('gradereport_singleview/user', 'init');
-        return $this->render_from_template('core_grades/user_selector', $data);
+        $data = [
+            'currentvalue' => $currentvalue,
+            'courseid' => $course->id,
+            'instance' => rand(),
+            'group' => $groupid ?? 0,
+            'resetlink' => $resetlink->out(false),
+            'name' => 'userid',
+            'value' => $submitteduserid ?? '',
+        ];
+        $dropdown = new comboboxsearch(
+            true,
+            $this->render_from_template('core_user/comboboxsearch/user_selector', $data),
+            null,
+            'user-search d-flex',
+            null,
+            'usersearchdropdown overflow-auto',
+            null,
+            false,
+        );
+        return $this->render_from_template($dropdown->get_template(), $dropdown->export_for_template($this));
     }
 
     /**
@@ -78,6 +89,7 @@ class gradereport_singleview_renderer extends plugin_renderer_base {
         $data = [
             'name' => 'itemid',
             'courseid' => $course->id,
+            'instance' => rand(),
         ];
 
         // If a particular grade item option is selected (not in zero state).
@@ -89,8 +101,25 @@ class gradereport_singleview_renderer extends plugin_renderer_base {
             $data['itemid'] = $gradeitemid;
         }
 
-        $this->page->requires->js_call_amd('gradereport_singleview/grade', 'init');
-        return $this->render_from_template('gradereport_singleview/grade_item_selector', $data);
+        $sbody = $this->render_from_template('core/local/comboboxsearch/searchbody', [
+            'courseid' => $course->id,
+            'currentvalue' => optional_param('gradesearchvalue', '', PARAM_NOTAGS),
+            'instance' => $data['instance'],
+        ]);
+        $dropdown = new comboboxsearch(
+            false,
+            $this->render_from_template('gradereport_singleview/grade_item_selector', $data),
+            $sbody,
+            'grade-search h-100',
+            'gradesearchwidget h-100',
+            'gradesearchdropdown overflow-auto',
+            null,
+            true,
+            get_string('selectagrade', 'gradereport_singleview'),
+            'itemid',
+            $gradeitemid
+        );
+        return $this->render_from_template($dropdown->get_template(), $dropdown->export_for_template($this));
     }
 
     /**
@@ -152,7 +181,6 @@ class gradereport_singleview_renderer extends plugin_renderer_base {
 
         if ($report->screen->supports_paging()) {
             $navigationdata['perpageselect'] = $report->screen->perpage_select();
-            $navigationdata['pager'] = $report->screen->pager();
         }
 
         if (isset($navigationdata)) {

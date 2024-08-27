@@ -1455,6 +1455,7 @@ function feedback_get_template_list($course, $onlyownorpublic = '') {
  *
  * @param string $typ
  * @return feedback_item_base the instance of itemclass
+ * @throws moodle_exception For invalid type
  */
 function feedback_get_item_class($typ) {
     global $CFG;
@@ -1462,11 +1463,20 @@ function feedback_get_item_class($typ) {
     require_once($CFG->dirroot.'/mod/feedback/item/feedback_item_class.php');
 
     //get the class of item-typ
-    $itemclass = 'feedback_item_'.$typ;
+    $typeclean = clean_param($typ, PARAM_ALPHA);
+
+    $itemclass = "feedback_item_{$typeclean}";
+    $itemclasspath = "{$CFG->dirroot}/mod/feedback/item/{$typeclean}/lib.php";
+
     //get the instance of item-class
-    if (!class_exists($itemclass)) {
-        require_once($CFG->dirroot.'/mod/feedback/item/'.$typ.'/lib.php');
+    if (!class_exists($itemclass) && file_exists($itemclasspath)) {
+        require_once($itemclasspath);
     }
+
+    if (!class_exists($itemclass)) {
+        throw new moodle_exception('typemissing', 'feedback');
+    }
+
     return new $itemclass();
 }
 
@@ -1880,10 +1890,10 @@ function feedback_set_tmp_values($feedbackcompleted) {
  *
  * @global object
  * @param object $feedbackcompletedtmp the temporary completed
- * @param object $feedbackcompleted the target completed
+ * @param stdClass|null $feedbackcompleted the target completed
  * @return int the id of the completed
  */
-function feedback_save_tmp_values($feedbackcompletedtmp, $feedbackcompleted) {
+function feedback_save_tmp_values($feedbackcompletedtmp, ?stdClass $feedbackcompleted = null) {
     global $DB;
 
     $tmpcplid = $feedbackcompletedtmp->id;
@@ -1973,7 +1983,7 @@ function feedback_delete_completedtmp() {
 function feedback_create_pagebreak($feedbackid) {
     global $DB;
 
-    //check if there already is a pagebreak on the last position
+    // Disallow pagebreak if there's already one present in last position, or the feedback has no items.
     $lastposition = $DB->count_records('feedback_item', array('feedback'=>$feedbackid));
     if ($lastposition == feedback_get_last_break_position($feedbackid)) {
         return false;

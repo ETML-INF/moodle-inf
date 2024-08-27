@@ -27,6 +27,7 @@ defined('MOODLE_INTERNAL') || die();
 
 global $CFG;
 require_once($CFG->dirroot . '/group/lib.php');
+require_once($CFG->dirroot . '/lib/grouplib.php');
 
 /**
  * Group lib testcase.
@@ -37,7 +38,7 @@ require_once($CFG->dirroot . '/group/lib.php');
  */
 class lib_test extends \advanced_testcase {
 
-    public function test_member_added_event() {
+    public function test_member_added_event(): void {
         $this->resetAfterTest();
 
         $this->setAdminUser();
@@ -60,7 +61,7 @@ class lib_test extends \advanced_testcase {
         $this->assertEquals($url, $event->get_url());
     }
 
-    public function test_member_removed_event() {
+    public function test_member_removed_event(): void {
         $this->resetAfterTest();
 
         $this->setAdminUser();
@@ -84,7 +85,7 @@ class lib_test extends \advanced_testcase {
         $this->assertEquals($url, $event->get_url());
     }
 
-    public function test_group_created_event() {
+    public function test_group_created_event(): void {
         $this->resetAfterTest();
 
         $this->setAdminUser();
@@ -103,7 +104,7 @@ class lib_test extends \advanced_testcase {
         $this->assertEquals($url, $event->get_url());
     }
 
-    public function test_grouping_created_event() {
+    public function test_grouping_created_event(): void {
         $this->resetAfterTest();
 
         $this->setAdminUser();
@@ -123,7 +124,7 @@ class lib_test extends \advanced_testcase {
         $this->assertEquals($url, $event->get_url());
     }
 
-    public function test_group_updated_event() {
+    public function test_group_updated_event(): void {
         global $DB;
 
         $this->resetAfterTest();
@@ -152,7 +153,7 @@ class lib_test extends \advanced_testcase {
         $this->assertEquals($url, $event->get_url());
     }
 
-    public function test_group_updated_event_does_not_require_names() {
+    public function test_group_updated_event_does_not_require_names(): void {
         global $DB;
 
         $this->resetAfterTest();
@@ -179,7 +180,7 @@ class lib_test extends \advanced_testcase {
         $this->assertEquals($url, $event->get_url());
     }
 
-    public function test_grouping_updated_event() {
+    public function test_grouping_updated_event(): void {
         global $DB;
 
         $this->resetAfterTest();
@@ -210,7 +211,7 @@ class lib_test extends \advanced_testcase {
         $this->assertEquals($url, $event->get_url());
     }
 
-    public function test_grouping_updated_event_does_not_require_names() {
+    public function test_grouping_updated_event_does_not_require_names(): void {
         global $DB;
 
         $this->resetAfterTest();
@@ -247,7 +248,7 @@ class lib_test extends \advanced_testcase {
         $this->assertEquals($url, $event->get_url());
     }
 
-    public function test_group_deleted_event() {
+    public function test_group_deleted_event(): void {
         $this->resetAfterTest();
 
         $course = $this->getDataGenerator()->create_course();
@@ -265,7 +266,7 @@ class lib_test extends \advanced_testcase {
         $this->assertEquals($url, $event->get_url());
     }
 
-    public function test_grouping_deleted_event() {
+    public function test_grouping_deleted_event(): void {
         $this->resetAfterTest();
 
         $course = $this->getDataGenerator()->create_course();
@@ -284,7 +285,7 @@ class lib_test extends \advanced_testcase {
         $this->assertEquals($url, $event->get_url());
     }
 
-    public function test_groups_delete_group_members() {
+    public function test_groups_delete_group_members(): void {
         global $DB;
         $this->resetAfterTest();
 
@@ -323,7 +324,7 @@ class lib_test extends \advanced_testcase {
         $this->assertFalse($DB->record_exists('groups_members', array('groupid' => $group1->id, 'userid' => $user2->id)));
     }
 
-    public function test_groups_remove_member() {
+    public function test_groups_remove_member(): void {
         global $DB;
         $this->resetAfterTest();
 
@@ -353,7 +354,7 @@ class lib_test extends \advanced_testcase {
         $this->assertFalse($DB->record_exists('groups_members', array('groupid' => $group2->id, 'userid' => $user1->id)));
     }
 
-    public function test_groups_delete_groupings_groups() {
+    public function test_groups_delete_groupings_groups(): void {
         global $DB;
         $this->resetAfterTest();
 
@@ -383,7 +384,7 @@ class lib_test extends \advanced_testcase {
             array('groupid' => $group1c2->id, 'groupingid' => $grouping1c2->id)));
     }
 
-    public function test_groups_delete_groups() {
+    public function test_groups_delete_groups(): void {
         global $DB;
         $this->resetAfterTest();
 
@@ -414,7 +415,7 @@ class lib_test extends \advanced_testcase {
         $this->assertFalse($DB->record_exists('groupings_groups', array('groupid' => $group1->id, 'groupingid' => $grouping1->id)));
     }
 
-    public function test_groups_delete_groupings() {
+    public function test_groups_delete_groupings(): void {
         global $DB;
         $this->resetAfterTest();
 
@@ -439,7 +440,96 @@ class lib_test extends \advanced_testcase {
         $this->assertFalse($DB->record_exists('groupings_groups', array('groupid' => $group1->id, 'groupingid' => $grouping1->id)));
     }
 
-    public function test_groups_create_autogroups () {
+    /**
+     * Test custom field for group.
+     * @covers ::groups_create_group
+     * @covers ::groups_get_group
+     */
+    public function test_groups_with_customfield(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+
+        $course1 = self::getDataGenerator()->create_course();
+        $course2 = self::getDataGenerator()->create_course();
+
+        $groupfieldcategory = self::getDataGenerator()->create_custom_field_category([
+            'component' => 'core_group',
+            'area' => 'group',
+        ]);
+        $groupcustomfield = self::getDataGenerator()->create_custom_field([
+            'shortname' => 'testgroupcustomfield1',
+            'type' => 'text',
+            'categoryid' => $groupfieldcategory->get('id'),
+        ]);
+        $groupingfieldcategory = self::getDataGenerator()->create_custom_field_category([
+            'component' => 'core_group',
+            'area' => 'grouping',
+        ]);
+        $groupingcustomfield = self::getDataGenerator()->create_custom_field([
+            'shortname' => 'testgroupingcustomfield1',
+            'type' => 'text',
+            'categoryid' => $groupingfieldcategory->get('id'),
+        ]);
+
+        $group1 = self::getDataGenerator()->create_group([
+            'courseid' => $course1->id,
+            'customfield_testgroupcustomfield1' => 'Custom input for group1',
+        ]);
+        $group2 = self::getDataGenerator()->create_group([
+            'courseid' => $course2->id,
+            'customfield_testgroupcustomfield1' => 'Custom input for group2',
+        ]);
+        $grouping1 = self::getDataGenerator()->create_grouping([
+            'courseid' => $course1->id,
+            'customfield_testgroupingcustomfield1' => 'Custom input for grouping1',
+        ]);
+        $grouping2 = self::getDataGenerator()->create_grouping([
+            'courseid' => $course2->id,
+            'customfield_testgroupingcustomfield1' => 'Custom input for grouping2',
+        ]);
+
+        $grouphandler = \core_group\customfield\group_handler::create();
+        $data = $grouphandler->export_instance_data_object($group1->id);
+        $this->assertSame('Custom input for group1', $data->testgroupcustomfield1);
+        $data = $grouphandler->export_instance_data_object($group2->id);
+        $this->assertSame('Custom input for group2', $data->testgroupcustomfield1);
+
+        $groupinghandler = \core_group\customfield\grouping_handler::create();
+        $data = $groupinghandler->export_instance_data_object($grouping1->id);
+        $this->assertSame('Custom input for grouping1', $data->testgroupingcustomfield1);
+        $data = $groupinghandler->export_instance_data_object($grouping2->id);
+        $this->assertSame('Custom input for grouping2', $data->testgroupingcustomfield1);
+
+        $group1->customfield_testgroupcustomfield1 = 'Updated input for group1';
+        $group2->customfield_testgroupcustomfield1 = 'Updated input for group2';
+        groups_update_group($group1);
+        groups_update_group($group2);
+        $data = $grouphandler->export_instance_data_object($group1->id);
+        $this->assertSame('Updated input for group1', $data->testgroupcustomfield1);
+        $data = $grouphandler->export_instance_data_object($group2->id);
+        $this->assertSame('Updated input for group2', $data->testgroupcustomfield1);
+
+        $group = groups_get_group($group1->id, '*', IGNORE_MISSING, true);
+        $this->assertCount(1, $group->customfields);
+        $customfield = reset($group->customfields);
+        $this->assertSame('Updated input for group1', $customfield['value']);
+
+        $grouping1->customfield_testgroupingcustomfield1 = 'Updated input for grouping1';
+        $grouping2->customfield_testgroupingcustomfield1 = 'Updated input for grouping2';
+        groups_update_grouping($grouping1);
+        groups_update_grouping($grouping2);
+        $data = $groupinghandler->export_instance_data_object($grouping1->id);
+        $this->assertSame('Updated input for grouping1', $data->testgroupingcustomfield1);
+        $data = $groupinghandler->export_instance_data_object($grouping2->id);
+        $this->assertSame('Updated input for grouping2', $data->testgroupingcustomfield1);
+
+        $grouping = groups_get_grouping($grouping1->id, '*', IGNORE_MISSING, true);
+        $this->assertCount(1, $grouping->customfields);
+        $customfield = reset($grouping->customfields);
+        $this->assertSame('Updated input for grouping1', $customfield['value']);
+    }
+
+    public function test_groups_create_autogroups(): void {
         global $DB;
         $this->resetAfterTest();
 
@@ -495,7 +585,7 @@ class lib_test extends \advanced_testcase {
     /**
      * Test groups_create_group enabling a group conversation.
      */
-    public function test_groups_create_group_with_conversation() {
+    public function test_groups_create_group_with_conversation(): void {
         global $DB;
 
         $this->resetAfterTest();
@@ -533,7 +623,7 @@ class lib_test extends \advanced_testcase {
     /**
      * Test groups_update_group enabling and disabling a group conversation.
      */
-    public function test_groups_update_group_conversation() {
+    public function test_groups_update_group_conversation(): void {
         global $DB;
 
         $this->resetAfterTest();
@@ -591,7 +681,7 @@ class lib_test extends \advanced_testcase {
     /**
      * Test groups_add_member to conversation.
      */
-    public function test_groups_add_member_conversation() {
+    public function test_groups_add_member_conversation(): void {
         global $DB;
         $this->resetAfterTest();
 
@@ -633,7 +723,7 @@ class lib_test extends \advanced_testcase {
     /**
      * Test groups_remove_member to conversation.
      */
-    public function test_groups_remove_member_conversation() {
+    public function test_groups_remove_member_conversation(): void {
         global $DB;
 
         $this->resetAfterTest();
@@ -680,7 +770,7 @@ class lib_test extends \advanced_testcase {
     /**
      * Test if you enable group messaging in a group with members these are added to the conversation.
      */
-    public function test_add_members_group_updated_conversation_enabled() {
+    public function test_add_members_group_updated_conversation_enabled(): void {
         global $DB;
 
         $this->resetAfterTest();
@@ -788,5 +878,94 @@ class lib_test extends \advanced_testcase {
         $result = groups_get_members_by_role($group1->id, $course1->id, 'u.username, up.value', null, 'up.name = :prefname',
                 ['prefname' => 'reptile'], 'JOIN {user_preferences} up ON up.userid = u.id');
         $this->assertEquals('snake', reset($result[0]->users)->value);
+    }
+
+    /**
+     * Tests set_groups_messaging
+     *
+     * @covers \core_group::set_groups_messaging
+     */
+    public function test_set_groups_messaging(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        $dg = $this->getDataGenerator();
+        $course = $dg->create_course();
+
+        // Create some groups in the course.
+        $groupids = [];
+        for ($i = 0; $i < 5; $i++) {
+            $group = new \stdClass();
+            $group->courseid = $course->id;
+            $group->name = 'group-'.$i;
+            $group->enablemessaging = 0;
+            $groupids[] = groups_create_group($group);
+        }
+
+        // They should all initially be disabled.
+        $alldisabledinitially = $this->check_groups_messaging_status_is($groupids, $course->id, false);
+        $this->assertTrue($alldisabledinitially);
+
+        // Enable messaging for all the groups.
+        set_groups_messaging($groupids, true);
+
+        // Check they were all enabled.
+        $allenabled = $this->check_groups_messaging_status_is($groupids, $course->id, true);
+        $this->assertTrue($allenabled);
+
+        // Disable messaging for all the groups.
+        set_groups_messaging($groupids, false);
+
+        // Check they were all disabled.
+        $alldisabled = $this->check_groups_messaging_status_is($groupids, $course->id, false);
+        $this->assertTrue($alldisabled);
+    }
+
+    /**
+     * Tests set group messaging where it doesn't exist
+     *
+     * @covers \core_group::set_groups_messaging
+     */
+    public function test_set_groups_messaging_doesnt_exist(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+
+        $groupids = [-1];
+
+        $this->expectException('dml_exception');
+        set_groups_messaging($groupids, false);
+    }
+
+    /**
+     * Checks the given list of groups to verify their messaging settings.
+     *
+     * @param array $groupids array of group ids
+     * @param int $courseid the course the groups are in
+     * @param bool $desired the desired setting value
+     * @return bool true if all groups $enablemessaging setting matches the given $desired value, else false
+     */
+    private function check_groups_messaging_status_is(array $groupids, int $courseid, bool $desired) {
+        $context = \context_course::instance($courseid);
+
+        foreach ($groupids as $groupid) {
+            $conversation = \core_message\api::get_conversation_by_area(
+                'core_group',
+                'groups',
+                $groupid,
+                $context->id
+            );
+
+            // An empty conversation means it has not been enabled yet.
+            if (empty($conversation)) {
+                $conversation = (object) [
+                    'enabled' => 0
+                ];
+            }
+
+            if ($desired !== boolval($conversation->enabled)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 }

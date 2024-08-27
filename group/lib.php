@@ -126,6 +126,13 @@ function groups_add_member($grouporid, $userorid, $component=null, $itemid=0) {
     $event->add_record_snapshot('groups', $group);
     $event->trigger();
 
+    // Dispatch the hook for a user added to the group.
+    $hook = new \core_group\hook\after_group_membership_added(
+        groupinstance: $group,
+        userids: [$userid],
+    );
+    \core\di::get(\core\hook\manager::class)->dispatch($hook);
+
     return true;
 }
 
@@ -232,6 +239,13 @@ function groups_remove_member($grouporid, $userorid) {
     $event->add_record_snapshot('groups', $group);
     $event->trigger();
 
+    // Dispatch the hook for a user removed from the group.
+    $hook = new \core_group\hook\after_group_membership_removed(
+        groupinstance: $group,
+        userids: [$userid],
+    );
+    \core\di::get(\core\hook\manager::class)->dispatch($hook);
+
     return true;
 }
 
@@ -274,6 +288,9 @@ function groups_create_group($data, $editform = false, $editoroptions = false) {
     }
 
     $data->id = $DB->insert_record('groups', $data);
+
+    $handler = \core_group\customfield\group_handler::create();
+    $handler->instance_form_save($data, true);
 
     if ($editform and $editoroptions) {
         // Update description from editor with fixed files
@@ -320,6 +337,12 @@ function groups_create_group($data, $editform = false, $editoroptions = false) {
     $event->add_record_snapshot('groups', $group);
     $event->trigger();
 
+    // Dispatch the hook for post group creation actions.
+    $hook = new \core_group\hook\after_group_created(
+        groupinstance: $group,
+    );
+    \core\di::get(\core\hook\manager::class)->dispatch($hook);
+
     return $group->id;
 }
 
@@ -351,6 +374,9 @@ function groups_create_grouping($data, $editoroptions=null) {
 
     $id = $DB->insert_record('groupings', $data);
     $data->id = $id;
+
+    $handler = \core_group\customfield\grouping_handler::create();
+    $handler->instance_form_save($data, true);
 
     if ($editoroptions !== null) {
         $description = new stdClass;
@@ -445,6 +471,9 @@ function groups_update_group($data, $editform = false, $editoroptions = false) {
 
     $DB->update_record('groups', $data);
 
+    $handler = \core_group\customfield\group_handler::create();
+    $handler->instance_form_save($data);
+
     // Invalidate the group data.
     cache_helper::invalidate_by_definition('core', 'groupdata', array(), array($data->courseid));
     // Rebuild the coursehiddengroups cache for the course.
@@ -502,6 +531,12 @@ function groups_update_group($data, $editform = false, $editoroptions = false) {
     $event->add_record_snapshot('groups', $group);
     $event->trigger();
 
+    // Dispatch the hook for post group update actions.
+    $hook = new \core_group\hook\after_group_updated(
+        groupinstance: $group,
+    );
+    \core\di::get(\core\hook\manager::class)->dispatch($hook);
+
     return true;
 }
 
@@ -528,6 +563,9 @@ function groups_update_grouping($data, $editoroptions=null) {
         $data = file_postupdate_standard_editor($data, 'description', $editoroptions, $editoroptions['context'], 'grouping', 'description', $data->id);
     }
     $DB->update_record('groupings', $data);
+
+    $handler = \core_group\customfield\grouping_handler::create();
+    $handler->instance_form_save($data);
 
     // Invalidate the group data.
     cache_helper::invalidate_by_definition('core', 'groupdata', array(), array($data->courseid));
@@ -603,6 +641,12 @@ function groups_delete_group($grouporid) {
     $event = \core\event\group_deleted::create($params);
     $event->add_record_snapshot('groups', $group);
     $event->trigger();
+
+    // Dispatch the hook for post group delete actions.
+    $hook = new \core_group\hook\after_group_deleted(
+        groupinstance: $group,
+    );
+    \core\di::get(\core\hook\manager::class)->dispatch($hook);
 
     return true;
 }
@@ -1207,4 +1251,76 @@ function core_group_inplace_editable($itemtype, $itemid, $newvalue) {
     if ($itemtype === 'user_groups') {
         return \core_group\output\user_groups_editable::update($itemid, $newvalue);
     }
+}
+
+/**
+ * Updates group messaging to enable/disable in bulk.
+ *
+ * @param array $groupids array of group id numbers.
+ * @param bool $enabled if true, enables messaging else disables messaging
+ */
+function set_groups_messaging(array $groupids, bool $enabled): void {
+    foreach ($groupids as $groupid) {
+        $data = groups_get_group($groupid, '*', MUST_EXIST);
+        $data->enablemessaging = $enabled;
+        groups_update_group($data);
+    }
+}
+
+/**
+ * Returns custom fields data for provided groups.
+ *
+ * @param array $groupids a list of group IDs to provide data for.
+ * @return \core_customfield\data_controller[]
+ */
+function get_group_custom_fields_data(array $groupids): array {
+    $result = [];
+
+    if (!empty($groupids)) {
+        $handler = \core_group\customfield\group_handler::create();
+        $customfieldsdata = $handler->get_instances_data($groupids, true);
+
+        foreach ($customfieldsdata as $groupid => $fieldcontrollers) {
+            foreach ($fieldcontrollers as $fieldcontroller) {
+                $result[$groupid][] = [
+                    'type' => $fieldcontroller->get_field()->get('type'),
+                    'value' => $fieldcontroller->export_value(),
+                    'valueraw' => $fieldcontroller->get_value(),
+                    'name' => $fieldcontroller->get_field()->get('name'),
+                    'shortname' => $fieldcontroller->get_field()->get('shortname'),
+                ];
+            }
+        }
+    }
+
+    return $result;
+}
+
+/**
+ * Returns custom fields data for provided groupings.
+ *
+ * @param array $groupingids a list of group IDs to provide data for.
+ * @return \core_customfield\data_controller[]
+ */
+function get_grouping_custom_fields_data(array $groupingids): array {
+    $result = [];
+
+    if (!empty($groupingids)) {
+        $handler = \core_group\customfield\grouping_handler::create();
+        $customfieldsdata = $handler->get_instances_data($groupingids, true);
+
+        foreach ($customfieldsdata as $groupingid => $fieldcontrollers) {
+            foreach ($fieldcontrollers as $fieldcontroller) {
+                $result[$groupingid][] = [
+                    'type' => $fieldcontroller->get_field()->get('type'),
+                    'value' => $fieldcontroller->export_value(),
+                    'valueraw' => $fieldcontroller->get_value(),
+                    'name' => $fieldcontroller->get_field()->get('name'),
+                    'shortname' => $fieldcontroller->get_field()->get('shortname'),
+                ];
+            }
+        }
+    }
+
+    return $result;
 }

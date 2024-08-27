@@ -16,6 +16,7 @@
 
 namespace mod_bigbluebuttonbn\local\proxy;
 
+use mod_bigbluebuttonbn\extension;
 use mod_bigbluebuttonbn\local\config;
 use mod_bigbluebuttonbn\local\exceptions\bigbluebutton_exception;
 use mod_bigbluebuttonbn\local\exceptions\server_not_available_exception;
@@ -51,14 +52,24 @@ abstract class proxy_base {
      * @param string $action
      * @param array $data
      * @param array $metadata
+     * @param int|null $instanceid
      * @return string
      */
-    protected static function action_url(string $action = '', array $data = [], array $metadata = []): string {
+    protected static function action_url(
+        string $action = '',
+        array $data = [],
+        array $metadata = [],
+        ?int $instanceid = null
+    ): string {
         $baseurl = self::sanitized_url() . $action . '?';
+        ['data' => $additionaldata, 'metadata' => $additionalmetadata] =
+            extension::action_url_addons($action, $data, $metadata, $instanceid);
+        $data = array_merge($data, $additionaldata ?? []);
+        $metadata = array_merge($metadata, $additionalmetadata ?? []);
+
         $metadata = array_combine(array_map(function($k) {
             return 'meta_' . $k;
         }, array_keys($metadata)), $metadata);
-
         $params = http_build_query($data + $metadata, '', '&');
         $checksum = self::get_checksum($action, $params);
         return $baseurl . $params . '&checksum=' . $checksum;
@@ -164,12 +175,14 @@ abstract class proxy_base {
      * @param string $action
      * @param array $data
      * @param array $metadata
+     * @param int|null $instanceid
      * @return null|bool|\SimpleXMLElement
      */
     protected static function fetch_endpoint_xml(
         string $action,
         array $data = [],
-        array $metadata = []
+        array $metadata = [],
+        ?int $instanceid = null
     ) {
         if (PHPUNIT_TEST && !defined('TEST_MOD_BIGBLUEBUTTONBN_MOCK_SERVER')) {
             return true; // In case we still use fetch and mock server is not defined, this prevents
@@ -177,7 +190,7 @@ abstract class proxy_base {
             // for example.
         }
         $curl = new curl();
-        return $curl->get(self::action_url($action, $data, $metadata));
+        return $curl->get(self::action_url($action, $data, $metadata, $instanceid));
     }
 
     /**

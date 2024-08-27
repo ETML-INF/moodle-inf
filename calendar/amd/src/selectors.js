@@ -66,11 +66,13 @@ define([], function() {
             navLink: '.calendarwrapper .arrow_link',
             eventLink: "[data-region='event-item']",
             miniDayLink: "[data-region='mini-day-link']",
+            dayLink: "[data-action='view-day-link']",
         },
         containers: {
             loadingIcon: '[data-region="overlay-icon-container"]',
         },
         mainCalendar: '.maincalendar .heightcontainer',
         fullCalendarView: 'page-calendar-view',
+        pageHeaderHeadings: '.page-header-headings h1',
     };
 });

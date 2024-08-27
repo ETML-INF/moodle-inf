@@ -69,7 +69,7 @@ class stored_file_exporter_test extends advanced_testcase {
             'license' => $file->get_license(),
             'filenameshort' => $file->get_filename(),
             'filesizeformatted' => display_size($file->get_filesize()),
-            'icon' => 'f/text-128',
+            'icon' => 'f/text',
             'timecreatedformatted' => userdate($file->get_timecreated()),
             'timemodifiedformatted' => userdate($file->get_timemodified()),
             'url' => "{$CFG->wwwroot}/pluginfile.php/{$contextuser->id}/user/draft/{$file->get_itemid()}/Hi.txt?forcedownload=1",

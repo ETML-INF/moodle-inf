@@ -79,10 +79,8 @@ $string['userselect'] = 'Select activity';
 
 $string['ariareporttype'] = 'Select a report type to view';
 $string['viewby'] = 'View by';
-$string['viewsingleuser'] = 'Select a user above to view all their grades';
+$string['viewsingleuser'] = 'Search for a user to view all their grades';
 $string['viewsinglegradeitem'] = 'Select a grade item above';
-$string['viewsingleuserorgradeitem'] = 'View all the grades of a single user or grade item.';
-$string['searchgrades'] = 'Search grade items';
 $string['selectagrade'] = 'Select a grade item';
 $string['selectgradeitemlink'] = 'Select a grade item';
 $string['singleviewdescription'] = 'In single view you can override or exclude selected grades and bulk insert grades.';
@@ -90,3 +88,6 @@ $string['unsaveddatawarning'] = 'Unsaved data warning';
 
 // Deprecated since Moodle 4.1.
 $string['filtergrades'] = 'Show grades for {$a}.';
+
+// Deprecated since Moodle 4.3.
+$string['viewsingleuserorgradeitem'] = 'View all the grades of a single user or grade item.';

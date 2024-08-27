@@ -41,12 +41,13 @@ class group_form extends moodleform {
     /**
      * Definition of the form
      */
-    function definition () {
+    function definition() {
         global $USER, $CFG, $COURSE;
         $coursecontext = context_course::instance($COURSE->id);
 
         $mform =& $this->_form;
         $editoroptions = $this->_customdata['editoroptions'];
+        $group = $this->_customdata['group'];
 
         $mform->addElement('header', 'general', get_string('general', 'form'));
 
@@ -82,13 +83,13 @@ class group_form extends moodleform {
         $mform->addHelpButton('participation', 'participation', 'group');
         $mform->setType('participation', PARAM_BOOL);
         $mform->setDefault('participation', 1);
-        $mform->disabledIf('participation', 'visibility', 'in', [GROUPS_VISIBILITY_OWN, GROUPS_VISIBILITY_NONE]);
+        $mform->hideIf('participation', 'visibility', 'in', [GROUPS_VISIBILITY_OWN, GROUPS_VISIBILITY_NONE]);
 
         // Group conversation messaging.
         if (\core_message\api::can_create_group_conversation($USER->id, $coursecontext)) {
             $mform->addElement('selectyesno', 'enablemessaging', get_string('enablemessaging', 'group'));
             $mform->addHelpButton('enablemessaging', 'enablemessaging', 'group');
-            $mform->disabledIf('enablemessaging', 'visibility', 'in', [GROUPS_VISIBILITY_OWN, GROUPS_VISIBILITY_NONE]);
+            $mform->hideIf('enablemessaging', 'visibility', 'in', [GROUPS_VISIBILITY_OWN, GROUPS_VISIBILITY_NONE]);
         }
 
         $mform->addElement('static', 'currentpicture', get_string('currentpicture'));
@@ -98,6 +99,10 @@ class group_form extends moodleform {
 
         $mform->addElement('filepicker', 'imagefile', get_string('newpicture', 'group'));
         $mform->addHelpButton('imagefile', 'newpicture', 'group');
+
+        $handler = \core_group\customfield\group_handler::create();
+        $handler->instance_form_definition($mform, empty($group->id) ? 0 : $group->id);
+        $handler->instance_form_before_set_data($group);
 
         $mform->addElement('hidden','id');
         $mform->setType('id', PARAM_INT);
@@ -153,6 +158,8 @@ class group_form extends moodleform {
             $participation->freeze();
         }
 
+        $handler = core_group\customfield\group_handler::create();
+        $handler->instance_form_definition_after_data($this->_form, empty($groupid) ? 0 : $groupid);
     }
 
     /**
@@ -173,8 +180,8 @@ class group_form extends moodleform {
         } else {
             $idnumber = '';
         }
-        if ($data['id'] and $group = $DB->get_record('groups', array('id'=>$data['id']))) {
-            if (core_text::strtolower($group->name) != core_text::strtolower($name)) {
+        if ($data['id'] && $group = $DB->get_record('groups', ['id' => $data['id']])) {
+            if ($group->name != $name) {
                 if (groups_get_group_by_name($COURSE->id,  $name)) {
                     $errors['name'] = get_string('groupnameexists', 'group', $name);
                 }
@@ -215,6 +222,9 @@ class group_form extends moodleform {
                 $errors['enrolmentkey'] = get_string('enrolmentkeyalreadyinuse', 'group');
             }
         }
+
+        $handler = \core_group\customfield\group_handler::create();
+        $errors = array_merge($errors, $handler->instance_form_validation($data, $files));
 
         return $errors;
     }

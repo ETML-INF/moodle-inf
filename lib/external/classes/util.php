@@ -146,14 +146,28 @@ class util {
                     $file['repositorytype'] = $areafile->get_repository_type();
                 }
                 $fileitemid = $useitemidinurl ? $areafile->get_itemid() : null;
-                $file['fileurl'] = moodle_url::make_webservice_pluginfile_url(
-                    $contextid,
-                    $component,
-                    $filearea,
-                    $fileitemid,
-                    $areafile->get_filepath(),
-                    $areafile->get_filename()
-                )->out(false);
+                // If AJAX request, generate a standard plugin file url.
+                if (AJAX_SCRIPT) {
+                    $fileurl = moodle_url::make_pluginfile_url(
+                        $contextid,
+                        $component,
+                        $filearea,
+                        $fileitemid,
+                        $areafile->get_filepath(),
+                        $areafile->get_filename()
+                    );
+                } else { // Otherwise, generate a webservice plugin file url.
+                    $fileurl = moodle_url::make_webservice_pluginfile_url(
+                        $contextid,
+                        $component,
+                        $filearea,
+                        $fileitemid,
+                        $areafile->get_filepath(),
+                        $areafile->get_filename()
+                    );
+                }
+                $file['fileurl'] = $fileurl->out(false);
+                $file['icon'] = file_file_icon($areafile);
                 $files[] = $file;
             }
         }
@@ -173,6 +187,7 @@ class util {
      * @param context $context
      * @param int $validuntil date when the token expired
      * @param string $iprestriction allowed ip - if 0 or empty then all ips are allowed
+     * @param string $name token name as a note or token identity at the table view.
      * @return string generated token
      */
     public static function generate_token(
@@ -181,9 +196,10 @@ class util {
         int $userid,
         context $context,
         int $validuntil = 0,
-        string $iprestriction = ''
+        string $iprestriction = '',
+        string $name = ''
     ): string {
-        global $DB, $USER;
+        global $DB, $USER, $SESSION;
 
         // Make sure the token doesn't exist (even if it should be almost impossible with the random generation).
         $numtries = 0;
@@ -220,7 +236,17 @@ class util {
 
         // Generate the private token, it must be transmitted only via https.
         $newtoken->privatetoken = random_string(64);
-        $DB->insert_record('external_tokens', $newtoken);
+
+        if (!$name) {
+            // Generate a token name.
+            $name = self::generate_token_name();
+        }
+        $newtoken->name = $name;
+
+        $tokenid = $DB->insert_record('external_tokens', $newtoken);
+        // Create new session to hold newly created token ID.
+        $SESSION->webservicenewlycreatedtoken = $tokenid;
+
         return $newtoken->token;
     }
 
@@ -399,6 +425,7 @@ class util {
                 $token->iprestriction = null;
                 $token->sid = null;
                 $token->lastaccess = null;
+                $token->name = self::generate_token_name();
                 // Generate the private token, it must be transmitted only via https.
                 $token->privatetoken = random_string(64);
                 $token->id = $DB->insert_record('external_tokens', $token);
@@ -435,7 +462,7 @@ class util {
      *
      * @param string|null $content The string to be filtered. Should be plain text, expect
      * possibly for multilang tags.
-     * @param context $context The id of the context for the string or the context (affects filters).
+     * @param int|context $context The id of the context for the string or the context (affects filters).
      * @param boolean $striplinks To strip any link in the result text. Moodle 1.8 default changed from false to true! MDL-8713
      * @param array $options options array/object or courseid
      * @return string text
@@ -618,5 +645,18 @@ class util {
         );
         $DB->delete_records('external_services', ['component' => $component]);
         $DB->delete_records('external_functions', ['component' => $component]);
+    }
+
+    /**
+     * Generate token name.
+     *
+     * @return string
+     */
+    public static function generate_token_name(): string {
+        return get_string(
+            'tokennameprefix',
+            'webservice',
+            random_string(5)
+        );
     }
 }

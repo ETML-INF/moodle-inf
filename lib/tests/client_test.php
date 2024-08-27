@@ -83,7 +83,7 @@ class client_test extends advanced_testcase {
      * @param array $expected
      * @throws ReflectionException
      */
-    public function test_map_userinfo_to_fields(array $mapping, array $expected) {
+    public function test_map_userinfo_to_fields(array $mapping, array $expected): void {
         $dataset = [
             "name" => (object) [
                 "firstname" => "John",
@@ -109,7 +109,6 @@ class client_test extends advanced_testcase {
         ];
 
         $method = new ReflectionMethod("core\oauth2\client", "map_userinfo_to_fields");
-        $method->setAccessible(true);
 
         $issuer = new \core\oauth2\issuer(0);
         $mockbuilder = $this->getMockBuilder('core\oauth2\client');

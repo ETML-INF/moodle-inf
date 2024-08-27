@@ -367,16 +367,6 @@
     width: 4em;
 }
 
-#adminthemeselector .selectedtheme td.c0 {
-    border: 1px solid $state-info-border;
-    border-right-width: 0;
-}
-
-#adminthemeselector .selectedtheme td.c1 {
-    border: 1px solid $state-info-border;
-    border-left-width: 0;
-}
-
 .admin_colourpicker,
 .admin_colourpicker_preview {
     display: none;

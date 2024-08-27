@@ -16,6 +16,7 @@
 
 defined('MOODLE_INTERNAL') || die;
 
+use core\output\comboboxsearch;
 use \core_grades\output\action_bar;
 use core_message\helper;
 use core_message\api;
@@ -44,26 +45,32 @@ class core_grades_renderer extends plugin_renderer_base {
      * Renders the group selector trigger element.
      *
      * @param object $course The course object.
-     * @param string|null $groupactionbaseurl The base URL for the group action.
+     * @param string|null $groupactionbaseurl This parameter has been deprecated since 4.4 and should not be used anymore.
      * @return string|null The raw HTML to render.
      */
     public function group_selector(object $course, ?string $groupactionbaseurl = null): ?string {
         global $USER;
 
+        if ($groupactionbaseurl !== null) {
+            debugging(
+                'The $groupactionbaseurl argument has been deprecated. Please remove it from your method calls.',
+                DEBUG_DEVELOPER,
+            );
+        }
         // Make sure that group mode is enabled.
         if (!$groupmode = $course->groupmode) {
             return null;
         }
 
-        $label = $groupmode == VISIBLEGROUPS ? get_string('selectgroupsvisible') :
-            get_string('selectgroupsseparate');
-
-        $data = [
-            'name' => 'group',
-            'label' => $label,
+        $sbody = $this->render_from_template('core_group/comboboxsearch/searchbody', [
             'courseid' => $course->id,
-            'groupactionbaseurl' => $groupactionbaseurl
-        ];
+            'currentvalue' => optional_param('groupsearchvalue', '', PARAM_NOTAGS),
+            'instance' => rand(),
+        ]);
+
+        $label = $groupmode == VISIBLEGROUPS ? get_string('selectgroupsvisible') : get_string('selectgroupsseparate');
+
+        $buttondata = ['label' => $label];
 
         $context = context_course::instance($course->id);
 
@@ -74,17 +81,29 @@ class core_grades_renderer extends plugin_renderer_base {
         }
 
         $activegroup = groups_get_course_group($course, true, $allowedgroups);
-        $data['group'] = $activegroup;
+        $buttondata['group'] = $activegroup;
 
         if ($activegroup) {
             $group = groups_get_group($activegroup);
-            $data['selectedgroup'] = format_string($group->name, true, ['context' => $context]);
+            $buttondata['selectedgroup'] = format_string($group->name, true, ['context' => $context]);
         } else if ($activegroup === 0) {
-            $data['selectedgroup'] = get_string('allparticipants');
+            $buttondata['selectedgroup'] = get_string('allparticipants');
         }
 
-        $this->page->requires->js_call_amd('core_grades/searchwidget/group', 'init');
-        return $this->render_from_template('core_grades/group_selector', $data);
+        $groupdropdown = new comboboxsearch(
+            false,
+            $this->render_from_template('core_group/comboboxsearch/group_selector', $buttondata),
+            $sbody,
+            'group-search',
+            'groupsearchwidget',
+            'groupsearchdropdown overflow-auto',
+            null,
+            true,
+            $label,
+            'group',
+            $activegroup
+        );
+        return $this->render_from_template($groupdropdown->get_template(), $groupdropdown->export_for_template($this));
     }
 
     /**
@@ -104,6 +123,8 @@ class core_grades_renderer extends plugin_renderer_base {
     ): stdClass {
         global $SESSION, $COURSE;
         // User search.
+        $searchvalue = optional_param('gpr_search', null, PARAM_NOTAGS);
+        $userid = optional_param('grp_userid', null, PARAM_INT);
         $url = new moodle_url($slug, ['id' => $course->id]);
         $firstinitial = $SESSION->gradereport["filterfirstname-{$context->id}"] ?? '';
         $lastinitial  = $SESSION->gradereport["filtersurname-{$context->id}"] ?? '';
@@ -120,7 +141,7 @@ class core_grades_renderer extends plugin_renderer_base {
             $currentfilter = get_string('filterlastactive', 'grades', ['last' => $lastinitial]);
         }
 
-        $this->page->requires->js_call_amd('core_grades/searchwidget/initials', 'init', [$slug]);
+        $this->page->requires->js_call_amd('core_grades/searchwidget/initials', 'init', [$slug, $userid, $searchvalue]);
 
         $formdata = (object) [
             'courseid' => $COURSE->id,
@@ -143,7 +164,7 @@ class core_grades_renderer extends plugin_renderer_base {
      * @param bool $showbuttons Whether to display buttons (message, add to contacts) within the heading.
      * @return string The raw HTML to render.
      */
-    public function user_heading(stdClass $user, int $courseid, bool $showbuttons = true) : string {
+    public function user_heading(stdClass $user, int $courseid, bool $showbuttons = true): string {
         global $USER;
 
         $headingdata = [

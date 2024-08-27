@@ -330,7 +330,8 @@ class page_requirements_manager {
                 'contextid'             => $contextid,
                 'contextInstanceId'     => (int) $contextinstanceid,
                 'langrev'               => get_string_manager()->get_revision(),
-                'templaterev'           => $this->get_templaterev()
+                'templaterev'           => $this->get_templaterev(),
+                'siteId'                => (int) SITEID,
             );
             if ($CFG->debugdeveloper) {
                 $this->M_cfg['developerdebug'] = true;
@@ -1660,7 +1661,7 @@ EOF;
      * @return string the HTML code to to at the end of the page.
      */
     public function get_end_code() {
-        global $CFG;
+        global $CFG, $USER;
         $output = '';
 
         // Set the log level for the JS logging.
@@ -1673,6 +1674,9 @@ EOF;
         // Add any global JS that needs to run on all pages.
         $this->js_call_amd('core/page_global', 'init');
         $this->js_call_amd('core/utility');
+        $this->js_call_amd('core/storage_validation', 'init', [
+            !empty($USER->currentlogin) ? (int) $USER->currentlogin : null
+        ]);
 
         // Call amd init functions.
         $output .= $this->get_amd_footercode();
@@ -1866,9 +1870,9 @@ class YUI_config {
     /**
      * Create a new group within the YUI_config system.
      *
-     * @param String $name The name of the group. This must be unique and
+     * @param string $name The name of the group. This must be unique and
      * not previously used.
-     * @param Array $config The configuration for this group.
+     * @param array $config The configuration for this group.
      * @return void
      */
     public function add_group($name, $config) {
@@ -1884,9 +1888,9 @@ class YUI_config {
      * Note, any existing configuration for that group will be wiped out.
      * This includes module configuration.
      *
-     * @param String $name The name of the group. This must be unique and
+     * @param string $name The name of the group. This must be unique and
      * not previously used.
-     * @param Array $config The configuration for this group.
+     * @param array $config The configuration for this group.
      * @return void
      */
     public function update_group($name, $config) {
@@ -1905,7 +1909,7 @@ class YUI_config {
      * name of the module being loaded.
      *
      * @param $function String the body of the JavaScript function. This should be used i
-     * @return String the name of the function to use in the group pattern configuration.
+     * @return string the name of the function to use in the group pattern configuration.
      */
     public function set_config_function($function) {
         $configname = 'yui' . (count($this->jsconfigfunctions) + 1) . 'ConfigFn';
@@ -1923,7 +1927,7 @@ class YUI_config {
      * When jsrev is positive, the function is minified and stored in a MUC cache for subsequent uses.
      *
      * @param $file The path to the JavaScript function used for YUI configuration.
-     * @return String the name of the function to use in the group pattern configuration.
+     * @return string the name of the function to use in the group pattern configuration.
      */
     public function set_config_source($file) {
         global $CFG;
@@ -1949,7 +1953,7 @@ class YUI_config {
     /**
      * Retrieve the list of JavaScript functions for YUI_config groups.
      *
-     * @return String The complete set of config functions
+     * @return string The complete set of config functions
      */
     public function get_config_functions() {
         $configfunctions = '';
@@ -1965,7 +1969,7 @@ class YUI_config {
      * Update the header JavaScript with any required modification for the YUI Loader.
      *
      * @param $js String The JavaScript to manipulate.
-     * @return String the modified JS string.
+     * @return string the modified JS string.
      */
     public function update_header_js($js) {
         // Update the names of the the configFn variables.
@@ -1980,9 +1984,9 @@ class YUI_config {
     /**
      * Add configuration for a specific module.
      *
-     * @param String $name The name of the module to add configuration for.
-     * @param Array $config The configuration for the specified module.
-     * @param String $group The name of the group to add configuration for.
+     * @param string $name The name of the module to add configuration for.
+     * @param array $config The configuration for the specified module.
+     * @param string $group The name of the group to add configuration for.
      * If not specified, then this module is added to the global
      * configuration.
      * @return void
@@ -2046,7 +2050,7 @@ class YUI_config {
      * This works through all modules capable of serving YUI modules, and attempts to get
      * metadata for each of those modules.
      *
-     * @return Array of module metadata
+     * @return array of module metadata
      */
     private function get_moodle_metadata() {
         $moodlemodules = array();
@@ -2083,8 +2087,8 @@ class YUI_config {
     /**
      * Helper function process and return the YUI metadata for all of the modules under the specified path.
      *
-     * @param String $path the UNC path to the YUI src directory.
-     * @return Array the complete array for frankenstyle directory.
+     * @param string $path the UNC path to the YUI src directory.
+     * @return array the complete array for frankenstyle directory.
      */
     private function get_moodle_path_metadata($path) {
         // Add module metadata is stored in frankenstyle_modname/yui/src/yui_modname/meta/yui_modname.json.
@@ -2113,10 +2117,10 @@ class YUI_config {
      * We must do this because we aggressively cache content on the browser, and we must also override use of the
      * external CDN which will serve the true authoritative copy of the code without our patches.
      *
-     * @param String combobase The local combobase
-     * @param String yuiversion The current YUI version
-     * @param Int patchlevel The patch level we're working to for YUI
-     * @param Array patchedmodules An array containing the names of the patched modules
+     * @param string $combobase The local combobase
+     * @param string $yuiversion The current YUI version
+     * @param int $patchlevel The patch level we're working to for YUI
+     * @param array $patchedmodules An array containing the names of the patched modules
      * @return void
      */
     public function define_patched_core_modules($combobase, $yuiversion, $patchlevel, $patchedmodules) {

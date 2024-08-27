@@ -14,7 +14,8 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 import ajax from 'core/ajax';
-import {get_string as getString} from "core/str";
+import {getString} from "core/str";
+import log from 'core/log';
 import SRLogger from "core/local/reactive/srlogger";
 
 /**
@@ -310,11 +311,14 @@ export default class {
     /**
      * Move course modules to specific course location.
      *
+     * @deprecated since Moodle 4.4 MDL-77038.
+     * @todo MDL-80116 This will be deleted in Moodle 4.8.
      * @param {StateManager} stateManager the current state manager
      * @param {array} sectionIds the list of section ids to move
      * @param {number} targetSectionId the target section id
      */
     async sectionMove(stateManager, sectionIds, targetSectionId) {
+        log.debug('sectionMove() is deprecated. Use sectionMoveAfter() instead');
         if (!targetSectionId) {
             throw new Error(`Mutation sectionMove requires targetSectionId`);
         }
@@ -442,6 +446,33 @@ export default class {
     }
 
     /**
+     * Set cms group mode to NOGROUPS.
+     * @param {StateManager} stateManager the current state manager
+     * @param {array} cmIds the list of cm ids
+     */
+    async cmNoGroups(stateManager, cmIds) {
+        await this._cmBasicAction(stateManager, 'cm_nogroups', cmIds);
+    }
+
+    /**
+     * Set cms group mode to VISIBLEGROUPS.
+     * @param {StateManager} stateManager the current state manager
+     * @param {array} cmIds the list of cm ids
+     */
+    async cmVisibleGroups(stateManager, cmIds) {
+        await this._cmBasicAction(stateManager, 'cm_visiblegroups', cmIds);
+    }
+
+    /**
+     * Set cms group mode to SEPARATEGROUPS.
+     * @param {StateManager} stateManager the current state manager
+     * @param {array} cmIds the list of cm ids
+     */
+    async cmSeparateGroups(stateManager, cmIds) {
+        await this._cmBasicAction(stateManager, 'cm_separategroups', cmIds);
+    }
+
+    /**
      * Lock or unlock course modules.
      *
      * @param {StateManager} stateManager the current state manager
@@ -541,12 +572,27 @@ export default class {
      * @param {boolean} collapsed the new collapsed value
      */
     async sectionIndexCollapsed(stateManager, sectionIds, collapsed) {
-        const collapsedIds = this._updateStateSectionPreference(stateManager, 'indexcollapsed', sectionIds, collapsed);
-        if (!collapsedIds) {
+        const affectedSections = this._updateStateSectionPreference(stateManager, 'indexcollapsed', sectionIds, collapsed);
+        if (!affectedSections) {
             return;
         }
         const course = stateManager.get('course');
-        await this._callEditWebservice('section_index_collapsed', course.id, collapsedIds);
+        let actionName = 'section_index_collapsed';
+        if (!collapsed) {
+            actionName = 'section_index_expanded';
+        }
+        await this._callEditWebservice(actionName, course.id, affectedSections);
+    }
+
+    /**
+     * Update the course index collapsed attribute of all sections.
+     *
+     * @param {StateManager} stateManager the current state manager
+     * @param {boolean} collapsed the new collapsed value
+     */
+    async allSectionsIndexCollapsed(stateManager, collapsed) {
+        const sectionIds = stateManager.getIds('section');
+        this.sectionIndexCollapsed(stateManager, sectionIds, collapsed);
     }
 
     /**
@@ -557,12 +603,16 @@ export default class {
      * @param {boolean} collapsed the new collapsed value
      */
     async sectionContentCollapsed(stateManager, sectionIds, collapsed) {
-        const collapsedIds = this._updateStateSectionPreference(stateManager, 'contentcollapsed', sectionIds, collapsed);
-        if (!collapsedIds) {
+        const affectedSections = this._updateStateSectionPreference(stateManager, 'contentcollapsed', sectionIds, collapsed);
+        if (!affectedSections) {
             return;
         }
         const course = stateManager.get('course');
-        await this._callEditWebservice('section_content_collapsed', course.id, collapsedIds);
+        let actionName = 'section_content_collapsed';
+        if (!collapsed) {
+            actionName = 'section_content_expanded';
+        }
+        await this._callEditWebservice(actionName, course.id, affectedSections);
     }
 
     /**
@@ -576,32 +626,22 @@ export default class {
      */
     _updateStateSectionPreference(stateManager, preferenceName, sectionIds, preferenceValue) {
         stateManager.setReadOnly(false);
-        const affectedSections = new Set();
+        const affectedSections = [];
         // Check if we need to update preferences.
         sectionIds.forEach(sectionId => {
             const section = stateManager.get('section', sectionId);
             if (section === undefined) {
+                stateManager.setReadOnly(true);
                 return null;
             }
             const newValue = preferenceValue ?? section[preferenceName];
             if (section[preferenceName] != newValue) {
                 section[preferenceName] = newValue;
-                affectedSections.add(section.id);
+                affectedSections.push(section.id);
             }
         });
         stateManager.setReadOnly(true);
-        if (affectedSections.size == 0) {
-            return null;
-        }
-        // Get all collapsed section ids.
-        const collapsedSectionIds = [];
-        const state = stateManager.state;
-        state.section.forEach(section => {
-            if (section[preferenceName]) {
-                collapsedSectionIds.push(section.id);
-            }
-        });
-        return collapsedSectionIds;
+        return affectedSections;
     }
 
     /**

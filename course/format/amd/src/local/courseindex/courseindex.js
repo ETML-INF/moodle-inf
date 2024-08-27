@@ -91,7 +91,7 @@ export default class Component extends BaseComponent {
             this.cms[cm.dataset.id] = cm;
         });
 
-        // Set the page item if any.
+        this._expandPageCmSectionIfNecessary(state);
         this._refreshPageItem({element: state.course, state});
 
         // Configure Aria Tree.
@@ -131,9 +131,9 @@ export default class Component extends BaseComponent {
             const toggler = section.querySelector(this.selectors.COLLAPSE);
             const isCollapsed = toggler?.classList.contains(this.classes.COLLAPSED) ?? false;
 
-            if (isChevron || isCollapsed) {
-                // Update the state.
-                const sectionId = section.getAttribute('data-id');
+            // Update the state.
+            const sectionId = section.getAttribute('data-id');
+            if (!sectionlink || isCollapsed) {
                 this.reactive.dispatch(
                     'sectionIndexCollapsed',
                     [sectionId],
@@ -220,6 +220,20 @@ export default class Component extends BaseComponent {
     }
 
     /**
+     * Expand a section if the current page is a section's cm.
+     *
+     * @private
+     * @param {Object} state the course state.
+     */
+    _expandPageCmSectionIfNecessary(state) {
+        const pageCmInfo = this.reactive.getPageAnchorCmInfo();
+        if (!pageCmInfo) {
+            return;
+        }
+        this._expandSectionNode(state.section.get(pageCmInfo.sectionid), true);
+    }
+
+    /**
      * Create a newcm instance.
      *
      * @param {object} param
@@ -293,10 +307,10 @@ export default class Component extends BaseComponent {
      * Refresh the section list.
      *
      * @param {object} param
-     * @param {Object} param.element
+     * @param {Object} param.state
      */
-    _refreshCourseSectionlist({element}) {
-        const sectionlist = element.sectionlist ?? [];
+    _refreshCourseSectionlist({state}) {
+        const sectionlist = this.reactive.getExporter().listedSectionIds(state);
         this._fixOrder(this.element, sectionlist, this.sections);
     }
 

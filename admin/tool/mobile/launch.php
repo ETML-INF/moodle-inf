@@ -44,6 +44,18 @@ if (!$CFG->enablewebservices) {
     throw new moodle_exception('enablewsdescription', 'webservice');
 }
 
+// Check if the service exists and is enabled.
+$service = $DB->get_record('external_services', ['shortname' => $serviceshortname, 'enabled' => 1]);
+if (empty($service)) {
+    throw new moodle_exception('servicenotavailable', 'webservice');
+}
+
+// Set a cookie indicating that there was a launch to authenticate via the site from the app.
+$ldata = json_encode(['service' => $serviceshortname, 'passport' => $passport,
+    'urlscheme' => $urlscheme, 'confirmed' => (int) $confirmed, 'oauthsso' => $oauthsso]);
+$expires = time() + (15 * MINSECS); // 15 minutes for authentication should be enough.
+setcookie('tool_mobile_launch', $ldata, $expires, $CFG->sessioncookiepath, $CFG->sessioncookiedomain);
+
 // We have been requested to start a SSO process via OpenID.
 if (!empty($oauthsso) && is_enabled_auth('oauth2')) {
     $wantsurl = new moodle_url('/admin/tool/mobile/launch.php',
@@ -63,16 +75,22 @@ if (empty($SESSION->justloggedin) &&
     throw new moodle_exception('pluginnotenabledorconfigured', 'tool_mobile');
 }
 
-// Check if the service exists and is enabled.
-$service = $DB->get_record('external_services', array('shortname' => $serviceshortname, 'enabled' => 1));
-if (empty($service)) {
-    throw new moodle_exception('servicenotavailable', 'webservice');
+// If the user is using the inapp (embedded) browser, we need to set the Secure and Partitioned attributes to the session cookie.
+if (\core_useragent::is_moodle_app()) {
+    \core\session\utility\cookie_helper::add_attributes_to_cookie_response_header(
+        "MoodleSession{$CFG->sessioncookie}",
+        ['Secure', 'Partitioned'],
+    );
 }
 
 require_login(0, false);
 
 // Require an active user: not guest, not suspended.
 core_user::require_active_user($USER);
+
+// Remove cookie.
+unset($_COOKIE['tool_mobile_launch']);
+setcookie('tool_mobile_launch', '', -1, $CFG->sessioncookiepath);
 
 // Get an existing token or create a new one.
 $timenow = time();
@@ -126,7 +144,7 @@ if ($confirmed or $isios) {
     }
 
     $notice = get_string('clickheretolaunchtheapp', 'tool_mobile');
-    echo html_writer::link($location, $notice, array('id' => 'launchapp'));
+    echo $OUTPUT->box(html_writer::link($location, $notice, ['id' => 'launchapp']), 'generalbox warning centerpara');
     echo html_writer::script(
         "window.onload = function() {
             document.getElementById('launchapp').click();

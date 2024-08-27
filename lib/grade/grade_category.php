@@ -1115,7 +1115,7 @@ class grade_category extends grade_object {
                 $freq = array_count_values($converted_grade_values);
                 arsort($freq);                      // sort by frequency keeping keys
                 $top = reset($freq);               // highest frequency count
-                $modes = array_keys($freq, $top);  // search for all modes (have the same highest count)
+                $modes = moodle_array_keys_filter($freq, $top);  // Search for all modes (have the same highest count).
                 rsort($modes, SORT_NUMERIC);       // get highest mode
                 $agg_grade = reset($modes);
                 // Record the weights as used.
@@ -1668,7 +1668,7 @@ class grade_category extends grade_object {
                 // An extra credit grade item doesn't contribute to $totaloverriddengrademax.
                 continue;
             } else if ($gradeitem->weightoverride > 0 && $gradeitem->aggregationcoef2 <= 0) {
-                // An overriden item that defines a weight of 0 does not contribute to $totaloverriddengrademax.
+                // An overridden item that defines a weight of 0 does not contribute to $totaloverriddengrademax.
                 continue;
             }
 
@@ -1684,8 +1684,6 @@ class grade_category extends grade_object {
         // Keep a record of how much the override total is to see if it is above 100. It it is then we need to set the
         // other weights to zero and normalise the others.
         $overriddentotal = 0;
-        // If the overridden weight total is higher than 1 then set the other untouched weights to zero.
-        $setotherweightstozero = false;
         // Total up all of the weights.
         foreach ($overridearray as $gradeitemdetail) {
             // If the grade item has extra credit, then don't add it to the normalisetotal.
@@ -2063,7 +2061,7 @@ class grade_category extends grade_object {
      * @param int   $sortorder The current sortorder
      * @return array An array containing 'object', 'type', 'depth' and optionally 'children'
      */
-    static private function _fetch_course_tree_recursion($category_array, &$sortorder) {
+    private static function _fetch_course_tree_recursion($category_array, &$sortorder) {
         if (isset($category_array['object']->gradetype) && $category_array['object']->gradetype==GRADE_TYPE_NONE) {
             return null;
         }

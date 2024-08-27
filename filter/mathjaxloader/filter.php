@@ -85,12 +85,7 @@ class filter_mathjaxloader extends moodle_text_filter {
             $lang = $this->map_language_code(current_language());
             $url = new moodle_url($url, array('delayStartupUntil' => 'configured'));
 
-            $moduleconfig = array(
-                'name' => 'mathjax',
-                'fullpath' => $url
-            );
-
-            $page->requires->js_module($moduleconfig);
+            $page->requires->js($url);
 
             $config = get_config('filter_mathjaxloader', 'mathjaxconfig');
             $wwwroot = new moodle_url('/');
@@ -99,7 +94,7 @@ class filter_mathjaxloader extends moodle_text_filter {
 
             $params = array('mathjaxconfig' => $config, 'lang' => $lang);
 
-            $page->requires->yui_module('moodle-filter_mathjaxloader-loader', 'M.filter_mathjaxloader.configure', array($params));
+            $page->requires->js_call_amd('filter_mathjaxloader/loader', 'configure', [$params]);
         }
     }
 
@@ -138,9 +133,13 @@ class filter_mathjaxloader extends moodle_text_filter {
 
         $hasdisplayorinline = false;
         if ($hasextra) {
+            // Convert the HTML tag wrapper inside the equation to entities.
+            $text = $this->escape_html_tag_wrapper($text);
             // If custom dilimeters are used, wrap whole text to prevent autolinking.
             $text = '<span class="nolink">' . $text . '</span>';
         } else if (preg_match('/\\\\[[(]/', $text) || preg_match('/\$\$/', $text)) {
+            // Convert the HTML tag wrapper inside the equation to entities.
+            $text = $this->escape_html_tag_wrapper($text);
             // Only parse the text if there are mathjax symbols in it. The recognized
             // math environments are \[ \] and $$ $$ for display mathematics and \( \)
             // for inline mathematics.
@@ -156,7 +155,7 @@ class filter_mathjaxloader extends moodle_text_filter {
         }
 
         if ($hasdisplayorinline || $hasextra) {
-            $PAGE->requires->yui_module('moodle-filter_mathjaxloader-loader', 'M.filter_mathjaxloader.typeset');
+            $PAGE->requires->js_call_amd('filter_mathjaxloader/loader', 'typeset');
             return '<span class="filter_mathjaxloader_equation">' . $text . '</span>';
         }
         return $text;
@@ -245,5 +244,21 @@ class filter_mathjaxloader extends moodle_text_filter {
                 '<span class="nolink">'. substr($text, $start, $end - $start + 1) .'</span>',
                 $start,
                 $end - $start + 1);
+    }
+
+    /**
+     * Escapes HTML tags within a string.
+     *
+     * This function replaces HTML tags enclosed in curly brackets with their respective HTML entities.
+     *
+     * @param string $text The input string containing HTML tags.
+     * @return string Returns the input string with HTML tags escaped.
+     */
+    private function escape_html_tag_wrapper(string $text): string {
+        return preg_replace_callback('/\{([^}]+)\}/', function(array $matches): string {
+            $search = ['<', '>'];
+            $replace = ['&lt;', '&gt;'];
+            return str_replace($search, $replace, $matches[0]);
+        }, $text);
     }
 }

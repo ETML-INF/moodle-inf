@@ -75,16 +75,44 @@ class helper_test extends \advanced_testcase {
      *
      * @covers ::question_history_url
      */
-    public function test_question_history_url() {
+    public function test_question_history_url(): void {
         $this->resetAfterTest();
-        $actionurl = helper::question_history_url($this->questiondata->questionbankentryid, $this->returnurl, $this->courseid);
+        $filter = urlencode('filters[]');
+        $actionurl = helper::question_history_url(
+            $this->questiondata->questionbankentryid,
+            $this->returnurl,
+            $this->courseid,
+            $filter,
+        );
         $params = [
             'entryid' => $this->questiondata->questionbankentryid,
             'returnurl' => $this->returnurl,
-            'courseid' => $this->courseid
+            'courseid' => $this->courseid,
+            'filter' => $filter,
         ];
         $expectedurl = new \moodle_url('/question/bank/history/history.php', $params);
         $this->assertEquals($expectedurl, $actionurl);
     }
 
+    /**
+     * Test the history action url when the filter parameter is null.
+     *
+     * @covers ::question_history_url
+     */
+    public function test_question_history_url_null_filter(): void {
+        $this->resetAfterTest();
+        $actionurl = helper::question_history_url(
+            $this->questiondata->questionbankentryid,
+            $this->returnurl,
+            $this->courseid,
+            null,
+        );
+        $params = [
+            'entryid' => $this->questiondata->questionbankentryid,
+            'returnurl' => $this->returnurl,
+            'courseid' => $this->courseid,
+        ];
+        $expectedurl = new \moodle_url('/question/bank/history/history.php', $params);
+        $this->assertEquals($expectedurl, $actionurl);
+    }
 }

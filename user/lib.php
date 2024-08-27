@@ -157,6 +157,15 @@ function user_update_user($user, $updatepassword = true, $triggerevent = true) {
         $user = (object) $user;
     }
 
+    $currentrecord = $DB->get_record('user', ['id' => $user->id]);
+
+    // Dispatch the hook for pre user update actions.
+    $hook = new \core_user\hook\before_user_updated(
+        user: $user,
+        currentuserdata: $currentrecord,
+    );
+    \core\di::get(\core\hook\manager::class)->dispatch($hook);
+
     // Check username.
     if (isset($user->username)) {
         if ($user->username !== core_text::strtolower($user->username)) {
@@ -186,6 +195,13 @@ function user_update_user($user, $updatepassword = true, $triggerevent = true) {
         unset($user->calendartype);
     }
 
+    // Delete theme usage cache if the theme has been changed.
+    if (isset($user->theme)) {
+        if ($user->theme != $currentrecord->theme) {
+            theme_delete_used_in_context_cache($user->theme, $currentrecord->theme);
+        }
+    }
+
     // Validate user data object.
     $uservalidation = core_user::validate($user);
     if ($uservalidation !== true) {
@@ -195,14 +211,13 @@ function user_update_user($user, $updatepassword = true, $triggerevent = true) {
         }
     }
 
-    $currentrecord = $DB->get_record('user', ['id' => $user->id]);
     $changedattributes = [];
     foreach ($user as $attributekey => $attributevalue) {
         // We explicitly want to ignore 'timemodified' attribute for checking, if an update is needed.
         if (!property_exists($currentrecord, $attributekey) || $attributekey === 'timemodified') {
             continue;
         }
-        if ($currentrecord->{$attributekey} != $attributevalue) {
+        if ($currentrecord->{$attributekey} !== $attributevalue) {
             $changedattributes[$attributekey] = $attributevalue;
         }
     }
@@ -271,7 +286,7 @@ function user_get_default_fields() {
         'institution', 'interests', 'firstaccess', 'lastaccess', 'auth', 'confirmed',
         'idnumber', 'lang', 'theme', 'timezone', 'mailformat', 'description', 'descriptionformat',
         'city', 'country', 'profileimageurlsmall', 'profileimageurl', 'customfields',
-        'groups', 'roles', 'preferences', 'enrolledcourses', 'suspended', 'lastcourseaccess'
+        'groups', 'roles', 'preferences', 'enrolledcourses', 'suspended', 'lastcourseaccess', 'trackforums',
     );
 }
 
@@ -379,7 +394,7 @@ function user_get_user_details($user, $course = null, array $userfields = array(
             foreach ($fields as $formfield) {
                 if ($formfield->show_field_content()) {
                     $userdetails['customfields'][] = [
-                        'name' => $formfield->field->name,
+                        'name' => $formfield->display_name(),
                         'value' => $formfield->data,
                         'displayvalue' => $formfield->display_data(),
                         'type' => $formfield->field->datatype,
@@ -415,9 +430,7 @@ function user_get_user_details($user, $course = null, array $userfields = array(
         $hiddenfields = array_flip(explode(',', $CFG->hiddenuserfields));
     }
 
-
-    if (!empty($user->address) && (in_array('address', $userfields)
-            && in_array('address', $showuseridentityfields) || $isadmin)) {
+    if (!empty($user->address) && (in_array('address', $userfields) || $isadmin)) {
         $userdetails['address'] = $user->address;
     }
     if (!empty($user->phone1) && (in_array('phone1', $userfields)
@@ -583,7 +596,7 @@ function user_get_user_details($user, $course = null, array $userfields = array(
     }
 
     if ($currentuser or has_capability('moodle/user:viewalldetails', $context)) {
-        $extrafields = ['auth', 'confirmed', 'lang', 'theme', 'mailformat'];
+        $extrafields = ['auth', 'confirmed', 'lang', 'theme', 'mailformat', 'trackforums'];
         foreach ($extrafields as $extrafield) {
             if (in_array($extrafield, $userfields) && isset($user->$extrafield)) {
                 $userdetails[$extrafield] = $user->$extrafield;
@@ -995,7 +1008,7 @@ function user_get_user_navigation_info($user, $page, $options = array()) {
  * @param string $password plaintext password
  * @return void
  */
-function user_add_password_history($userid, $password) {
+function user_add_password_history(int $userid, #[\SensitiveParameter] string $password): void {
     global $CFG, $DB;
 
     if (empty($CFG->passwordreuselimit) or $CFG->passwordreuselimit < 0) {
@@ -1003,12 +1016,18 @@ function user_add_password_history($userid, $password) {
     }
 
     // Note: this is using separate code form normal password hashing because
-    //       we need to have this under control in the future. Also the auth
-    //       plugin might not store the passwords locally at all.
+    // we need to have this under control in the future. Also, the auth
+    // plugin might not store the passwords locally at all.
+
+    // First generate a cryptographically suitable salt.
+    $randombytes = random_bytes(16);
+    $salt = substr(strtr(base64_encode($randombytes), '+', '.'), 0, 16);
+    // Then create the hash.
+    $generatedhash = crypt($password, '$6$rounds=10000$' . $salt . '$');
 
     $record = new stdClass();
     $record->userid = $userid;
-    $record->hash = password_hash($password, PASSWORD_DEFAULT);
+    $record->hash = $generatedhash;
     $record->timecreated = time();
     $DB->insert_record('user_password_history', $record);
 

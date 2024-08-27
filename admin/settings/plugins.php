@@ -116,6 +116,17 @@ if ($hassiteconfig) {
     $temp->add($setting);
     $temp->add(new admin_setting_configcheckbox('verifychangedemail', new lang_string('verifychangedemail', 'admin'), new lang_string('configverifychangedemail', 'admin'), 1));
 
+    // ReCaptcha.
+    $temp->add(new admin_setting_configselect('enableloginrecaptcha',
+        new lang_string('auth_loginrecaptcha', 'auth'),
+        new lang_string('auth_loginrecaptcha_desc', 'auth'),
+        0,
+        [
+            new lang_string('no'),
+            new lang_string('yes'),
+        ],
+    ));
+
     $setting = new admin_setting_configtext('recaptchapublickey', new lang_string('recaptchapublickey', 'admin'), new lang_string('configrecaptchapublickey', 'admin'), '', PARAM_NOTAGS);
     $setting->set_force_ltr(true);
     $temp->add($setting);
@@ -123,6 +134,18 @@ if ($hassiteconfig) {
     $setting->set_force_ltr(true);
     $temp->add($setting);
     $ADMIN->add('authsettings', $temp);
+
+    // Toggle password visiblity icon.
+    $temp->add(new admin_setting_configselect('loginpasswordtoggle',
+        new lang_string('auth_loginpasswordtoggle', 'auth'),
+        new lang_string('auth_loginpasswordtoggle_desc', 'auth'),
+        TOGGLE_SENSITIVE_SMALL_SCREENS_ONLY,
+        [
+            TOGGLE_SENSITIVE_DISABLED => get_string('disabled', 'admin'),
+            TOGGLE_SENSITIVE_ENABLED => get_string('enabled', 'admin'),
+            TOGGLE_SENSITIVE_SMALL_SCREENS_ONLY => get_string('smallscreensonly', 'admin'),
+        ],
+    ));
 
     $temp = new admin_externalpage('authtestsettings', get_string('testsettings', 'core_auth'), new moodle_url("/auth/test_settings.php"), 'moodle/site:config', true);
     $ADMIN->add('authsettings', $temp);
@@ -172,6 +195,10 @@ if ($hassiteconfig) {
     $ADMIN->add('modules', new admin_category('antivirussettings', new lang_string('antiviruses', 'antivirus')));
     $temp = new admin_settingpage('manageantiviruses', new lang_string('antivirussettings', 'antivirus'));
     $temp->add(new admin_setting_manageantiviruses());
+
+    // Status check.
+    $temp->add(new admin_setting_heading('antivirus/statuschecks', new lang_string('statuschecks'), ''));
+    $temp->add(new admin_setting_check('antivirus/checkantivirus', new \core\check\environment\antivirus()));
 
     // Common settings.
     $temp->add(new admin_setting_heading('antiviruscommonsettings', new lang_string('antiviruscommonsettings', 'antivirus'), ''));
@@ -778,6 +805,20 @@ if ($hassiteconfig) {
     foreach ($plugins as $plugin) {
         /** @var \core\plugininfo\calendartype $plugin */
         $plugin->load_settings($ADMIN, 'calendartype', $hassiteconfig);
+    }
+}
+
+// Communication plugins.
+if ($hassiteconfig && core_communication\api::is_available()) {
+    $ADMIN->add('modules', new admin_category('communicationsettings', new lang_string('communication', 'core_communication')));
+    $temp = new admin_settingpage('managecommunicationproviders',
+        new lang_string('managecommunicationproviders', 'core_communication'));
+    $temp->add(new \core_communication\admin\manage_communication_providers_page());
+    $ADMIN->add('communicationsettings', $temp);
+    $plugins = core_plugin_manager::instance()->get_plugins_of_type('communication');
+    foreach ($plugins as $plugin) {
+        /** @var \core\plugininfo\communication $plugin */
+        $plugin->load_settings($ADMIN, 'communicationsettings', $hassiteconfig);
     }
 }
 

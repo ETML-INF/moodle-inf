@@ -28,9 +28,9 @@
 require_once(__DIR__ . '/../../../../lib/behat/behat_base.php');
 require_once(__DIR__ . '/../../../../question/tests/behat/behat_question_base.php');
 
-use Behat\Gherkin\Node\TableNode as TableNode;
-
-use Behat\Mink\Exception\ExpectationException as ExpectationException;
+use Behat\Gherkin\Node\TableNode;
+use Behat\Mink\Exception\DriverException;
+use Behat\Mink\Exception\ExpectationException;
 use mod_quiz\quiz_attempt;
 use mod_quiz\quiz_settings;
 
@@ -92,6 +92,10 @@ class behat_mod_quiz extends behat_question_base {
                 return new moodle_url('/mod/quiz/edit.php',
                         ['cmid' => $this->get_cm_by_quiz_name($identifier)->id]);
 
+            case 'multiple grades setup':
+                return new moodle_url('/mod/quiz/editgrading.php',
+                        ['cmid' => $this->get_cm_by_quiz_name($identifier)->id]);
+
             case 'group overrides':
                 return new moodle_url('/mod/quiz/overrides.php',
                     ['cmid' => $this->get_cm_by_quiz_name($identifier)->id, 'mode' => 'group']);
@@ -145,6 +149,9 @@ class behat_mod_quiz extends behat_question_base {
                 return new moodle_url('/mod/quiz/review.php', ['attempt' => $attempt->id]);
 
             case 'question bank':
+                // The question bank does not handle fields at the edge of the viewport well.
+                // Increase the size to avoid this.
+                $this->execute('behat_general::i_change_window_size_to', ['window', 'large']);
                 return new moodle_url('/question/edit.php', [
                     'cmid' => $this->get_cm_by_quiz_name($identifier)->id,
                 ]);
@@ -276,35 +283,60 @@ class behat_mod_quiz extends behat_question_base {
                 } else {
                     $includingsubcategories = clean_param($questiondata['includingsubcategories'], PARAM_BOOL);
                 }
-                quiz_add_random_questions($quiz, $page, $question->category, 1, $includingsubcategories);
+
+                $filter = [
+                    'category' => [
+                        'jointype' => \qbank_managecategories\category_condition::JOINTYPE_DEFAULT,
+                        'values' => [$question->category],
+                        'filteroptions' => ['includesubcategories' => $includingsubcategories],
+                    ],
+                ];
+                $filtercondition['filter'] = $filter;
+                $settings = quiz_settings::create($quiz->id);
+                $structure = \mod_quiz\structure::create_for_quiz($settings);
+                $structure->add_random_questions($page, 1, $filtercondition);
             } else {
                 // Add the question.
                 quiz_add_quiz_question($question->id, $quiz, $page, $maxmark);
             }
 
+            // Look for additional properties we might want to set on the new slot.
+            $extraslotproperties = [];
+
             // Display number (allowing editable customised question number).
             if (array_key_exists('displaynumber', $questiondata)) {
-                $slot = $DB->get_field('quiz_slots', 'MAX(slot)', ['quizid' => $quiz->id]);
-                $DB->set_field('quiz_slots', 'displaynumber', $questiondata['displaynumber'],
-                        ['quizid' => $quiz->id, 'slot' => $slot]);
                 if (!is_number($questiondata['displaynumber']) && !is_string($questiondata['displaynumber'])) {
                     throw new ExpectationException('Displayed question number for "' . $questiondata['question'] .
                             '" should either be \'i\', automatically numbered (eg. 1, 2, 3),
                             or customised (eg. A.1, A.2, 1.1, 1.2)', $this->getSession());
                 }
+                $extraslotproperties['displaynumber'] = $questiondata['displaynumber'];
             }
 
             // Require previous.
             if (array_key_exists('requireprevious', $questiondata)) {
                 if ($questiondata['requireprevious'] === '1') {
-                    $slot = $DB->get_field('quiz_slots', 'MAX(slot)', ['quizid' => $quiz->id]);
-                    $DB->set_field('quiz_slots', 'requireprevious', 1,
-                            ['quizid' => $quiz->id, 'slot' => $slot]);
+                    $extraslotproperties['requireprevious'] = 1;
                 } else if ($questiondata['requireprevious'] !== '' && $questiondata['requireprevious'] !== '0') {
                     throw new ExpectationException('Require previous for question "' .
-                            $questiondata['question'] . '" should be 0, 1 or blank.',
-                            $this->getSession());
+                        $questiondata['question'] . '" should be 0, 1 or blank.',
+                        $this->getSession());
                 }
+            }
+
+            // Grade item.
+            if (array_key_exists('grade item', $questiondata) && trim($questiondata['grade item']) !== '') {
+                $extraslotproperties['quizgradeitemid'] =
+                    $DB->get_field('quiz_grade_items', 'id',
+                        ['quizid' => $quiz->id, 'name' => $questiondata['grade item']], MUST_EXIST);
+            }
+
+            // If there were any extra properties, save them.
+            if ($extraslotproperties) {
+                // We assume that the slot was just created for this row of data is the highest numbered one.
+                $extraslotproperties['id'] = $DB->get_field('quiz_slots', 'MAX(id)', ['quizid' => $quiz->id]);
+
+                $DB->update_record('quiz_slots', $extraslotproperties);
             }
         }
 
@@ -597,7 +629,6 @@ class behat_mod_quiz extends behat_question_base {
     public function i_click_on_shuffle_for_section($heading) {
         $xpath = $this->get_xpath_for_shuffle_checkbox($heading);
         $checkbox = $this->find('xpath', $xpath);
-        $this->ensure_node_is_visible($checkbox);
         $checkbox->click();
     }
 

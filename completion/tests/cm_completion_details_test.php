@@ -41,6 +41,7 @@ require_once($CFG->libdir . '/completionlib.php');
  * @package   core_completion
  * @copyright 2021 Jun Pataleta <jun@moodle.com>
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ * @coversDefaultClass \core_completion\cm_completion_details
  */
 class cm_completion_details_test extends advanced_testcase {
 
@@ -121,11 +122,12 @@ class cm_completion_details_test extends advanced_testcase {
     /**
      * Test for has_completion().
      *
+     * @covers ::has_completion
      * @dataProvider has_completion_provider
      * @param int $completion The completion tracking mode.
      * @param bool $expectedresult Expected result.
      */
-    public function test_has_completion(int $completion, bool $expectedresult) {
+    public function test_has_completion(int $completion, bool $expectedresult): void {
         $cmcompletion = $this->setup_data($completion);
 
         $this->assertEquals($expectedresult, $cmcompletion->has_completion());
@@ -153,14 +155,48 @@ class cm_completion_details_test extends advanced_testcase {
     /**
      * Test for is_available().
      *
+     * @covers ::is_automatic
      * @dataProvider is_automatic_provider
      * @param int $completion The completion tracking mode.
      * @param bool $expectedresult Expected result.
      */
-    public function test_is_automatic(int $completion, bool $expectedresult) {
+    public function test_is_automatic(int $completion, bool $expectedresult): void {
         $cmcompletion = $this->setup_data($completion);
 
         $this->assertEquals($expectedresult, $cmcompletion->is_automatic());
+    }
+
+    /**
+     * Provides data for test_is_manual().
+     *
+     * @return array[]
+     */
+    public function is_manual_provider(): array {
+        return [
+            'Automatic' => [
+                COMPLETION_TRACKING_AUTOMATIC, false
+            ],
+            'Manual' => [
+                COMPLETION_TRACKING_MANUAL, true
+            ],
+            'None' => [
+                COMPLETION_TRACKING_NONE, false
+            ],
+        ];
+    }
+
+    /**
+     * Test for is_manual().
+     *
+     * @covers ::is_manual
+     * @dataProvider is_manual_provider
+     * @param int $completion The completion tracking mode.
+     * @param bool $expectedresult Expected result.
+     */
+    public function test_is_manual(int $completion, bool $expectedresult): void {
+        $cmcompletion = $this->setup_data($completion);
+
+        $this->assertEquals($expectedresult, $cmcompletion->is_manual());
     }
 
     /**
@@ -177,13 +213,149 @@ class cm_completion_details_test extends advanced_testcase {
     /**
      * Test for get_overall_completion().
      *
+     * @covers ::get_overall_completion
      * @dataProvider overall_completion_provider
      * @param int $state
      */
-    public function test_get_overall_completion(int $state) {
+    public function test_get_overall_completion(int $state): void {
         $completiondata = (object)['completionstate' => $state];
         $cmcompletion = $this->setup_data(COMPLETION_TRACKING_AUTOMATIC, [], $completiondata);
         $this->assertEquals($state, $cmcompletion->get_overall_completion());
+    }
+
+    /**
+     * Data provider for test_is_overall_complete().
+     * @return array[]
+     */
+    public static function is_overall_complete_provider(): array {
+        return [
+            'Automatic, require view, not viewed' => [
+                'expected' => false,
+                'completion' => COMPLETION_TRACKING_AUTOMATIC,
+                'completionstate' => COMPLETION_INCOMPLETE,
+                'completionview' => COMPLETION_INCOMPLETE,
+                'completiongrade' => null,
+                'completionpassgrade' => null,
+            ],
+            'Automatic, require view, viewed' => [
+                'expected' => true,
+                'completion' => COMPLETION_TRACKING_AUTOMATIC,
+                'completionstate' => COMPLETION_COMPLETE,
+                'completionview' => COMPLETION_COMPLETE,
+                'completiongrade' => null,
+                'completionpassgrade' => null,
+            ],
+            'Automatic, require grade, not graded' => [
+                'expected' => false,
+                'completion' => COMPLETION_TRACKING_AUTOMATIC,
+                'completionstate' => COMPLETION_INCOMPLETE,
+                'completionview' => null,
+                'completiongrade' => COMPLETION_INCOMPLETE,
+                'completionpassgrade' => null,
+            ],
+            'Automatic, require grade, graded with fail' => [
+                'expected' => true,
+                'completion' => COMPLETION_TRACKING_AUTOMATIC,
+                'completionstate' => COMPLETION_COMPLETE_FAIL,
+                'completionview' => null,
+                'completiongrade' => COMPLETION_COMPLETE_FAIL,
+                'completionpassgrade' => null,
+            ],
+            'Automatic, require grade, graded with passing' => [
+                'expected' => true,
+                'completion' => COMPLETION_TRACKING_AUTOMATIC,
+                'completionstate' => COMPLETION_COMPLETE_PASS,
+                'completionview' => null,
+                'completiongrade' => COMPLETION_COMPLETE_PASS,
+                'completionpassgrade' => null,
+            ],
+            'Automatic, require passgrade, not graded' => [
+                'expected' => false,
+                'completion' => COMPLETION_TRACKING_AUTOMATIC,
+                'completionstate' => COMPLETION_INCOMPLETE,
+                'completionview' => null,
+                'completiongrade' => null,
+                'completionpassgrade' => COMPLETION_INCOMPLETE,
+            ],
+            'Automatic, require passgrade, graded with fail' => [
+                'expected' => false,
+                'completion' => COMPLETION_TRACKING_AUTOMATIC,
+                'completionstate' => COMPLETION_COMPLETE_FAIL,
+                'completionview' => null,
+                'completiongrade' => null,
+                'completionpassgrade' => COMPLETION_COMPLETE_FAIL,
+            ],
+            'Automatic, require passgrade, graded with passing' => [
+                'expected' => true,
+                'completion' => COMPLETION_TRACKING_AUTOMATIC,
+                'completionstate' => COMPLETION_COMPLETE_PASS,
+                'completionview' => null,
+                'completiongrade' => null,
+                'completionpassgrade' => COMPLETION_COMPLETE_PASS,
+            ],
+            'Manual, incomplete' => [
+                'expected' => false,
+                'completion' => COMPLETION_TRACKING_MANUAL,
+                'completionstate' => COMPLETION_INCOMPLETE,
+            ],
+            'Manual, complete' => [
+                'expected' => true,
+                'completion' => COMPLETION_TRACKING_MANUAL,
+                'completionstate' => COMPLETION_COMPLETE,
+            ],
+            'None, incomplete' => [
+                'expected' => false,
+                'completion' => COMPLETION_TRACKING_NONE,
+                'completionstate' => COMPLETION_INCOMPLETE,
+            ],
+            'None, complete' => [
+                'expected' => false,
+                'completion' => COMPLETION_TRACKING_NONE,
+                'completionstate' => COMPLETION_COMPLETE,
+            ],
+        ];
+    }
+
+    /**
+     * Test for is_overall_complete().
+     *
+     * @covers ::is_overall_complete
+     * @dataProvider is_overall_complete_provider
+     * @param bool $expected Expected result returned by is_overall_complete().
+     * @param int $completion The completion tracking mode.
+     * @param int $completionstate The overall completion state.
+     * @param int|null $completionview Completion status of the "view" completion condition.
+     * @param int|null $completiongrade Completion status of the "must receive grade" completion condition.
+     * @param int|null $completionpassgrade Completion status of the "must receive passing grade" completion condition.
+     */
+    public function test_is_overall_complete(
+        bool $expected,
+        int $completion,
+        int $completionstate,
+        ?int $completionview = null,
+        ?int $completiongrade = null,
+        ?int $completionpassgrade = null,
+    ): void {
+        $options = [];
+        $getdatareturn = (object)[
+            'completionstate' => $completionstate,
+            'viewed' => $completionview,
+            'completiongrade' => $completiongrade,
+            'passgrade' => $completionpassgrade,
+        ];
+
+        if (!is_null($completionview)) {
+            $options['completionview'] = true;
+        }
+        if (!is_null($completiongrade)) {
+            $options['completionusegrade'] = true;
+        }
+        if (!is_null($completionpassgrade)) {
+            $options['completionpassgrade'] = true;
+        }
+
+        $cmcompletion = $this->setup_data($completion, $options, $getdatareturn);
+        $this->assertEquals($expected, $cmcompletion->is_overall_complete());
     }
 
     /**
@@ -316,6 +488,7 @@ class cm_completion_details_test extends advanced_testcase {
     /**
      * Test for \core_completion\cm_completion_details::get_details().
      *
+     * @covers ::get_details
      * @dataProvider get_details_provider
      * @param int $completion The completion tracking mode.
      * @param int|null $completionview Completion status of the "view" completion condition.
@@ -324,7 +497,7 @@ class cm_completion_details_test extends advanced_testcase {
      * @param array $expecteddetails Expected completion details returned by get_details().
      */
     public function test_get_details(int $completion, ?int $completionview,
-             ?int $completiongrade, ?int $completionpassgrade, array $expecteddetails) {
+             ?int $completiongrade, ?int $completionpassgrade, array $expecteddetails): void {
         $options = [];
         $getdatareturn = (object)[
             'viewed' => $completionview,
@@ -415,6 +588,7 @@ class cm_completion_details_test extends advanced_testcase {
     /**
      * Test custom sort order is functioning in \core_completion\cm_completion_details::get_details().
      *
+     * @covers ::get_details
      * @dataProvider get_details_custom_order_provider
      * @param bool $completionview Completion status of the "view" completion condition.
      * @param bool $completiongrade Completion status of the "must receive grade" completion condition.
@@ -423,7 +597,7 @@ class cm_completion_details_test extends advanced_testcase {
      * @param array $expectedorder The expected order of completion conditions returned about the module.
      */
     public function test_get_details_custom_order(bool $completionview, bool $completiongrade, array $customcompletionrules,
-            string $modname, array $expectedorder) {
+            string $modname, array $expectedorder): void {
 
         $options['customcompletion'] = [];
         $customcompletiondata = [];

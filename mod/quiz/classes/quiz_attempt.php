@@ -21,8 +21,12 @@ use block_contents;
 use cm_info;
 use coding_exception;
 use context_module;
+use core\di;
+use core\hook;
 use Exception;
 use html_writer;
+use mod_quiz\hook\attempt_state_changed;
+use mod_quiz\output\grades\grade_out_of;
 use mod_quiz\output\links_to_other_attempts;
 use mod_quiz\output\renderer;
 use mod_quiz\question\bank\qbank_helper;
@@ -70,20 +74,37 @@ class quiz_attempt {
     /** @var stdClass the quiz_attempts row. */
     protected $attempt;
 
-    /** @var question_usage_by_activity the question usage for this quiz attempt. */
-    protected $quba;
+    /**
+     * @var question_usage_by_activity|null the question usage for this quiz attempt.
+     *
+     * Only available after load_questions is called, e.g. if the class is constructed
+     * with $loadquestions true (the default).
+     */
+    protected ?question_usage_by_activity $quba = null;
 
     /**
-     * @var array of slot information. These objects contain ->slot (int),
-     *      ->requireprevious (bool), ->questionids (int) the original question for random questions,
+     * @var array of slot information. These objects contain ->id (int), ->slot (int),
+     *      ->requireprevious (bool), ->displaynumber (string) and quizgradeitemid (int) from the DB.
+     *      They do not contain page - get that from {@see get_question_page()} -
+     *      or maxmark - get that from $this->quba. It is augmented with
      *      ->firstinsection (bool), ->section (stdClass from $this->sections).
-     *      This does not contain page - get that from {@see get_question_page()} -
-     *      or maxmark - get that from $this->quba.
      */
     protected $slots;
 
     /** @var array of quiz_sections rows, with a ->lastslot field added. */
     protected $sections;
+
+    /** @var grade_calculator instance for this quiz. */
+    protected grade_calculator $gradecalculator;
+
+    /**
+     * @var grade_out_of[]|null can be used to store the total grade for each section.
+     *
+     * This is typically done when one or more attempts are created without load_questions.
+     * This lets the mark totals be passed in and later used. Format of this array should
+     * match what {@see grade_calculator::compute_grade_item_totals()} would return.
+     */
+    protected ?array $gradeitemmarks = null;
 
     /** @var array page no => array of slot numbers on the page in order. */
     protected $pagelayout;
@@ -103,7 +124,7 @@ class quiz_attempt {
      *
      * @param stdClass $attempt the row of the quiz_attempts table.
      * @param stdClass $quiz the quiz object for this attempt and user.
-     * @param stdClass|cm_info $cm the course_module object for this quiz.
+     * @param cm_info $cm the course_module object for this quiz.
      * @param stdClass $course the row from the course table for the course we belong to.
      * @param bool $loadquestions (optional) if true, the default, load all the details
      *      of the state of each question. Else just set up the basic details of the attempt.
@@ -111,9 +132,11 @@ class quiz_attempt {
     public function __construct($attempt, $quiz, $cm, $course, $loadquestions = true) {
         $this->attempt = $attempt;
         $this->quizobj = new quiz_settings($quiz, $cm, $course);
+        $this->gradecalculator = $this->quizobj->get_grade_calculator();
 
         if ($loadquestions) {
             $this->load_questions();
+            $this->gradecalculator->set_slots($this->slots);
         }
     }
 
@@ -178,8 +201,8 @@ class quiz_attempt {
         }
 
         $this->quba = question_engine::load_questions_usage_by_activity($this->attempt->uniqueid);
-        $this->slots = $DB->get_records('quiz_slots',
-                ['quizid' => $this->get_quizid()], 'slot', 'slot, id, requireprevious, displaynumber');
+        $this->slots = $DB->get_records('quiz_slots', ['quizid' => $this->get_quizid()],
+                'slot', 'slot, id, requireprevious, displaynumber, quizgradeitemid');
         $this->sections = array_values($DB->get_records('quiz_sections',
                 ['quizid' => $this->get_quizid()], 'firstslot'));
 
@@ -352,7 +375,7 @@ class quiz_attempt {
     /**
      * Get the course_module for this quiz.
      *
-     * @return stdClass|cm_info the course_module object.
+     * @return cm_info the course_module object.
      */
     public function get_cm() {
         return $this->quizobj->get_cm();
@@ -476,6 +499,38 @@ class quiz_attempt {
     }
 
     /**
+     * Compute the grade and maximum grade for each grade item, for this attempt.
+     *
+     * @return grade_out_of[] the grade for each item where the total grade is not zero.
+     *      ->name will be set to the grade item name. Must be output through {@see format_string()}.
+     */
+    public function get_grade_item_totals(): array {
+        if ($this->gradeitemmarks !== null) {
+            return $this->gradeitemmarks;
+        } else if ($this->quba !== null) {
+            return $this->gradecalculator->compute_grade_item_totals($this->quba);
+        } else {
+            throw new coding_exception('To call get_grade_item_totals, you must either have ' .
+                '->quba set (e.g. create this class with $loadquestions true) or you must ' .
+                'previously have computed the totals (e.g. with ' .
+                'grade_calculator::compute_grade_item_totals_for_attempts() and pass them to ' .
+                '->set_grade_item_totals().');
+        }
+    }
+
+    /**
+     * Set the total grade for each grade_item for this quiz.
+     *
+     * You only need to do this if the instance of this class was created with $loadquestions false.
+     * Typically, you will have got the grades from {@see grade_calculator::compute_grade_item_totals_for_attempts()}.
+     *
+     * @param grade_out_of[] $grades same form as {@see grade_calculator::compute_grade_item_totals()} would return.
+     */
+    public function set_grade_item_totals(array $grades): void {
+        $this->gradeitemmarks = $grades;
+    }
+
+    /**
      * Get the total number of marks that the user had scored on all the questions.
      *
      * @return float
@@ -593,10 +648,15 @@ class quiz_attempt {
      * The values are arrays with two items, title and content. Each of these
      * will be either a string, or a renderable.
      *
+     * If this method is called before load_questions() is called, then an empty array is returned.
+     *
      * @param question_display_options $options the display options for this quiz attempt at this time.
      * @return array as described above.
      */
     public function get_additional_summary_data(question_display_options $options) {
+        if (!isset($this->quba)) {
+            return [];
+        }
         return $this->quba->get_summary_information($options);
     }
 
@@ -947,8 +1007,7 @@ class quiz_attempt {
      * state data about this question.
      *
      * @param int $slot the number used to identify this question within this attempt.
-     * @return string the formatted grade, to the number of decimal places specified
-     *      by the quiz.
+     * @return string the name of the question. Must be output through format_string.
      */
     public function get_question_name($slot) {
         return $this->quba->get_question($slot, false)->name;
@@ -1116,7 +1175,7 @@ class quiz_attempt {
      * @param int $page the page number (starting with 0) in the attempt.
      * @return string attempt page title.
      */
-    public function attempt_page_title(int $page) : string {
+    public function attempt_page_title(int $page): string {
         if ($this->get_num_pages() > 1) {
             $a = new stdClass();
             $a->name = $this->get_quiz_name();
@@ -1149,7 +1208,7 @@ class quiz_attempt {
      *
      * @return string summary page title.
      */
-    public function summary_page_title() : string {
+    public function summary_page_title(): string {
         return get_string('attemptsummarytitle', 'quiz', $this->get_quiz_name());
     }
 
@@ -1178,7 +1237,7 @@ class quiz_attempt {
      * @param bool $showall whether the review page contains the entire attempt on one page.
      * @return string title of the review page.
      */
-    public function review_page_title(int $page, bool $showall = false) : string {
+    public function review_page_title(int $page, bool $showall = false): string {
         if (!$showall && $this->get_num_pages() > 1) {
             $a = new stdClass();
             $a->name = $this->get_quiz_name();
@@ -1297,6 +1356,7 @@ class quiz_attempt {
             $displayoptions->manualcomment = question_display_options::HIDDEN;
             $displayoptions->history = question_display_options::HIDDEN;
             $displayoptions->readonly = true;
+            $displayoptions->versioninfo = question_display_options::HIDDEN;
 
             return html_writer::div($placeholderqa->render($displayoptions,
                     $this->get_question_number($this->get_original_slot($slot))),
@@ -1758,6 +1818,8 @@ class quiz_attempt {
 
         question_engine::save_questions_usage_by_activity($this->quba);
 
+        $originalattempt = clone $this->attempt;
+
         $this->attempt->timemodified = $timestamp;
         $this->attempt->timefinish = $timefinish ?? $timestamp;
         $this->attempt->sumgrades = $this->quba->get_total_mark();
@@ -1779,6 +1841,7 @@ class quiz_attempt {
             // Trigger event.
             $this->fire_state_transition_event('\mod_quiz\event\attempt_submitted', $timestamp, $studentisonline);
 
+            di::get(hook\manager::class)->dispatch(new attempt_state_changed($originalattempt, $this->attempt));
             // Tell any access rules that care that the attempt is over.
             $this->get_access_manager($timestamp)->current_attempt_finished();
         }
@@ -1815,6 +1878,7 @@ class quiz_attempt {
     public function process_going_overdue($timestamp, $studentisonline) {
         global $DB;
 
+        $originalattempt = clone $this->attempt;
         $transaction = $DB->start_delegated_transaction();
         $this->attempt->timemodified = $timestamp;
         $this->attempt->state = self::OVERDUE;
@@ -1825,6 +1889,7 @@ class quiz_attempt {
 
         $this->fire_state_transition_event('\mod_quiz\event\attempt_becameoverdue', $timestamp, $studentisonline);
 
+        di::get(hook\manager::class)->dispatch(new attempt_state_changed($originalattempt, $this->attempt));
         $transaction->allow_commit();
 
         quiz_send_overdue_message($this);
@@ -1839,6 +1904,7 @@ class quiz_attempt {
     public function process_abandon($timestamp, $studentisonline) {
         global $DB;
 
+        $originalattempt = clone $this->attempt;
         $transaction = $DB->start_delegated_transaction();
         $this->attempt->timemodified = $timestamp;
         $this->attempt->state = self::ABANDONED;
@@ -1846,6 +1912,8 @@ class quiz_attempt {
         $DB->update_record('quiz_attempts', $this->attempt);
 
         $this->fire_state_transition_event('\mod_quiz\event\attempt_abandoned', $timestamp, $studentisonline);
+
+        di::get(hook\manager::class)->dispatch(new attempt_state_changed($originalattempt, $this->attempt));
 
         $transaction->allow_commit();
     }
@@ -1867,6 +1935,7 @@ class quiz_attempt {
             throw new coding_exception('Can only reopen an attempt that was never submitted.');
         }
 
+        $originalattempt = clone $this->attempt;
         $transaction = $DB->start_delegated_transaction();
         $this->attempt->timemodified = $timestamp;
         $this->attempt->state = self::IN_PROGRESS;
@@ -1875,6 +1944,7 @@ class quiz_attempt {
 
         $this->fire_state_transition_event('\mod_quiz\event\attempt_reopened', $timestamp, false);
 
+        di::get(hook\manager::class)->dispatch(new attempt_state_changed($originalattempt, $this->attempt));
         $timeclose = $this->get_access_manager($timestamp)->get_end_time($this->attempt);
         if ($timeclose && $timestamp > $timeclose) {
             $this->process_finish($timestamp, false, $timeclose);
@@ -2335,5 +2405,53 @@ class quiz_attempt {
             }
         }
         return $totalunanswered;
+    }
+
+    /**
+     * If any questions in this attempt have changed, update the attempts.
+     *
+     * For now, this should only be done for previews.
+     *
+     * When we update the question, we keep the same question (in the case of random questions)
+     * and the same variant (if this question has variants). If possible, we use regrade to
+     * preserve any interaction that has been had with this question (e.g. a saved answer) but
+     * if that is not possible, we put in a newly started attempt.
+     */
+    public function update_questions_to_new_version_if_changed(): void {
+        global $DB;
+
+        $versioninformation = qbank_helper::get_version_information_for_questions_in_attempt(
+            $this->attempt, $this->get_context());
+
+        $anychanges = false;
+        foreach ($versioninformation as $slotinformation) {
+            if ($slotinformation->currentquestionid == $slotinformation->newquestionid) {
+                continue;
+            }
+
+            $anychanges = true;
+
+            $slot = $slotinformation->questionattemptslot;
+            $newquestion = question_bank::load_question($slotinformation->newquestionid);
+            if (empty($this->quba->validate_can_regrade_with_other_version($slot, $newquestion))) {
+                // We can use regrade to replace the question while preserving any existing state.
+                $finished = $this->get_attempt()->state == self::FINISHED;
+                $this->quba->regrade_question($slot, $finished, null, $newquestion);
+            } else {
+                // So much has changed, we have to replace the question with a new attempt.
+                $oldvariant = $this->get_question_attempt($slot)->get_variant();
+                $slot = $this->quba->add_question_in_place_of_other($slot, $newquestion, null, false);
+                $this->quba->start_question($slot, $oldvariant);
+            }
+        }
+
+        if ($anychanges) {
+            question_engine::save_questions_usage_by_activity($this->quba);
+            if ($this->attempt->state == self::FINISHED) {
+                $this->attempt->sumgrades = $this->quba->get_total_mark();
+                $DB->update_record('quiz_attempts', $this->attempt);
+                $this->recompute_final_grade();
+            }
+        }
     }
 }

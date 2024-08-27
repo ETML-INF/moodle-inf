@@ -39,7 +39,7 @@ class date_test extends advanced_testcase {
     /**
      * @covers ::get_default_php_timezone
      */
-    public function test_get_default_php_timezone() {
+    public function test_get_default_php_timezone(): void {
         $this->resetAfterTest();
 
         $origtz = core_date::get_default_php_timezone();
@@ -58,7 +58,7 @@ class date_test extends advanced_testcase {
     /**
      * @covers ::normalise_timezone
      */
-    public function test_normalise_timezone() {
+    public function test_normalise_timezone(): void {
         $this->resetAfterTest();
 
         $this->setTimezone('Pacific/Auckland');
@@ -125,7 +125,7 @@ class date_test extends advanced_testcase {
     /**
      * @covers ::normalise_timezone
      */
-    public function test_windows_conversion() {
+    public function test_windows_conversion(): void {
         $file = __DIR__ . '/fixtures/timezonewindows.xml';
 
         $contents = file_get_contents($file);
@@ -150,7 +150,7 @@ class date_test extends advanced_testcase {
     /**
      * Sanity test for PHP stuff.
      */
-    public function test_php_gmt_offsets() {
+    public function test_php_gmt_offsets(): void {
         $this->resetAfterTest();
 
         $this->setTimezone('Pacific/Auckland', 'Pacific/Auckland');
@@ -182,7 +182,7 @@ class date_test extends advanced_testcase {
      *
      * @coversNothing
      */
-    public function test_timezone_all_lang_strings() {
+    public function test_timezone_all_lang_strings(): void {
         // We only run this test when PHPUNIT_LONGTEST is enabled, test_get_localised_timezone()
         // is already checking the names of a few, hopefully stable enough to be run always.
         if (!PHPUNIT_LONGTEST) {
@@ -200,7 +200,7 @@ class date_test extends advanced_testcase {
     /**
      * @covers ::get_localised_timezone
      */
-    public function test_get_localised_timezone() {
+    public function test_get_localised_timezone(): void {
         $this->resetAfterTest();
 
         $this->setTimezone('Pacific/Auckland', 'Pacific/Auckland');
@@ -236,7 +236,7 @@ class date_test extends advanced_testcase {
     /**
      * @covers ::get_list_of_timezones
      */
-    public function test_get_list_of_timezones() {
+    public function test_get_list_of_timezones(): void {
         $this->resetAfterTest();
 
         $this->setTimezone('Pacific/Auckland', 'Pacific/Auckland');
@@ -287,7 +287,7 @@ class date_test extends advanced_testcase {
     /**
      * @covers ::get_server_timezone
      */
-    public function test_get_server_timezone() {
+    public function test_get_server_timezone(): void {
         global $CFG;
         $this->resetAfterTest();
 
@@ -315,7 +315,7 @@ class date_test extends advanced_testcase {
     /**
      * @covers ::get_server_timezone_object
      */
-    public function test_get_server_timezone_object() {
+    public function test_get_server_timezone_object(): void {
         $this->resetAfterTest();
 
         $zones = core_date::get_list_of_timezones();
@@ -330,7 +330,7 @@ class date_test extends advanced_testcase {
     /**
      * @covers ::set_default_server_timezone
      */
-    public function test_set_default_server_timezone() {
+    public function test_set_default_server_timezone(): void {
         global $CFG;
         $this->resetAfterTest();
 
@@ -452,7 +452,7 @@ class date_test extends advanced_testcase {
      * @param string $tz The legacy timezone.
      * @param string $expected The expected converted timezone.
      */
-    public function test_get_legacy_user_timezone($tz, $expected) {
+    public function test_get_legacy_user_timezone($tz, $expected): void {
         $this->setTimezone('Australia/Perth', 'Australia/Perth');
         $this->assertEquals($expected, core_date::get_user_timezone($tz));
     }
@@ -460,7 +460,7 @@ class date_test extends advanced_testcase {
     /**
      * @covers ::get_user_timezone
      */
-    public function test_get_user_timezone() {
+    public function test_get_user_timezone(): void {
         global $CFG, $USER;
         $this->resetAfterTest();
 
@@ -599,7 +599,7 @@ class date_test extends advanced_testcase {
     /**
      * @covers ::get_user_timezone_object
      */
-    public function test_get_user_timezone_object() {
+    public function test_get_user_timezone_object(): void {
         global $CFG, $USER;
         $this->resetAfterTest();
 
@@ -613,5 +613,57 @@ class date_test extends advanced_testcase {
             $this->assertInstanceOf('DateTimeZone', $tz);
             $this->assertSame($zone, $tz->getName());
         }
+    }
+
+    /**
+     * Data provider for the values for test_core_strftime().
+     *
+     * @return array
+     */
+    public static function get_strftime_provider(): array {
+        return [
+            'string_c' => [
+                "1708405742",
+                "%c",
+                "20 February 2024 at 1:09 pm",
+            ],
+            'numeric_c' => [
+                1708405742,
+                "%c",
+                "20 February 2024 at 1:09 pm",
+            ],
+            'string_strftimedatetime' => [
+                "1708405742",
+                get_string("strftimedatetime", 'langconfig'),
+                "20 February 2024, 01:09 PM",
+            ],
+            'numeric_strftimedatetime' => [
+                1708405742,
+                get_string("strftimedatetime", 'langconfig'),
+                "20 February 2024, 01:09 PM",
+            ],
+            'string_strftimedatetimeshortaccurate' => [
+                "1708405742",
+                get_string("strftimedatetimeshortaccurate", 'langconfig'),
+                "20/02/24, 13:09:02",
+            ],
+            'numeric_strftimedatetimeshortaccurate' => [
+                1708405742,
+                get_string("strftimedatetimeshortaccurate", 'langconfig'),
+                "20/02/24, 13:09:02",
+            ],
+        ];
+    }
+
+    /**
+     * Test \core_date::strftime function.
+     *
+     * @dataProvider get_strftime_provider
+     * @param mixed $input Input passed to strftime
+     * @param string $format The date format to pass to strftime, falls back to '%c' if null
+     * @param string $expected The output generated by strftime
+     */
+    public function test_strftime(mixed $input, string $format, string $expected): void {
+        $this->assertEqualsIgnoringWhitespace($expected, core_date::strftime($format, $input));
     }
 }

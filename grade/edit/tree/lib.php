@@ -69,10 +69,6 @@ class grade_edit_tree {
         $this->columns[] = grade_edit_tree_column::factory('status');
         $this->columns[] = grade_edit_tree_column::factory('actions');
 
-        if ($this->deepest_level > 1) {
-            $this->columns[] = grade_edit_tree_column::factory('select');
-        }
-
         $this->table = new html_table();
         $this->table->id = "grade_edit_tree_table";
         $this->table->attributes['class'] = 'generaltable simple setup-grades';
@@ -105,10 +101,10 @@ class grade_edit_tree {
 
         $object = $element['object'];
         $eid    = $element['eid'];
-        $name = $this->gtree->get_element_header($element, true, false, true, false, true);
-        $icon = $this->gtree->get_element_icon($element);
-        $type = $this->gtree->get_element_type_string($element);
-        $strippedname = $this->gtree->get_element_header($element, false, false, false);
+        $name = grade_helper::get_element_header($element, true, false, true, false, true);
+        $icon = grade_helper::get_element_icon($element);
+        $type = grade_helper::get_element_type_string($element);
+        $strippedname = grade_helper::get_element_header($element, false, false, false);
         $is_category_item = false;
         if ($element['type'] == 'categoryitem' || $element['type'] == 'courseitem') {
             $is_category_item = true;
@@ -162,7 +158,7 @@ class grade_edit_tree {
             $level++;
             $this->categories[$object->id] = $strippedname;
             $category = grade_category::fetch(array('id' => $object->id));
-            $item = $category->get_grade_item();
+            $category->load_grade_item();
 
             // Add aggregation coef input if not a course item and if parent category has correct aggregation type
             // Before we print the category's row, we must find out how many rows will appear below it (for the filler cell's rowspan)
@@ -275,7 +271,13 @@ class grade_edit_tree {
             $categoryrow->id = 'grade-item-' . $eid;
             $categoryrow->attributes['class'] = $courseclass . ' category ';
             $categoryrow->attributes['data-category'] = $eid;
-            $categoryrow->attributes['data-itemid'] = $category->get_grade_item()->id;
+            if (!empty($parent_eid)) {
+                $categoryrow->attributes['data-parent-category'] = $parent_eid;
+            }
+            $categoryrow->attributes['data-aggregation'] = $category->aggregation;
+            $categoryrow->attributes['data-grademax'] = $category->grade_item->grademax;
+            $categoryrow->attributes['data-aggregationcoef'] = floatval($category->grade_item->aggregationcoef);
+            $categoryrow->attributes['data-itemid'] = $category->grade_item->id;
             $categoryrow->attributes['data-hidden'] = 'false';
             foreach ($rowclasses as $class) {
                 $categoryrow->attributes['class'] .= ' ' . $class;
@@ -345,6 +347,10 @@ class grade_edit_tree {
             // collapsed and the aggregated max grade is not visible.
             if (!empty($categoryitemclass)) {
                 $gradeitemrow->attributes['data-aggregationforcategory'] = $parent_eid;
+            } else {
+                $gradeitemrow->attributes['data-parent-category'] = $parent_eid;
+                $gradeitemrow->attributes['data-grademax'] = $object->grademax;
+                $gradeitemrow->attributes['data-aggregationcoef'] = floatval($object->aggregationcoef);
             }
             foreach ($rowclasses as $class) {
                 $gradeitemrow->attributes['class'] .= ' ' . $class;
@@ -364,7 +370,7 @@ class grade_edit_tree {
                             'moveaction' => $moveaction,
                             'itemtype' => $object->itemtype,
                             'icon' => $icon,
-                            'type' => $type
+                            'type' => $type,
                         ]
                     );
                 }
@@ -742,7 +748,7 @@ abstract class grade_edit_tree_column {
         }
     }
 
-    public abstract function get_header_cell();
+    abstract public function get_header_cell();
 
     public function get_category_cell($category, $levelclass, $params) {
         $cell = clone($this->categorycell);
@@ -819,39 +825,104 @@ class grade_edit_tree_column_name extends grade_edit_tree_column {
             'category' => $params['eid']
         ]);
 
+        $mastercheckbox = '';
+        if ($this->deepest_level > 1) {
+            if (empty($params['eid'])) {
+                throw new Exception('Array key (eid) missing from 3rd param of ' .
+                    'grade_edit_tree_column_select::get_category_cell($category, $levelclass, $params)');
+            }
+
+            // Get toggle group for this master checkbox.
+            $togglegroup = $this->get_checkbox_togglegroup($category);
+            // Set label for this master checkbox.
+            $masterlabel = $params['level'] === 1 ? get_string('all') : $params['name'];
+            // Build the master checkbox.
+            $mastercheckbox = new \core\output\checkbox_toggleall($togglegroup, true, [
+                'id' => 'select_category_' . $category->id,
+                'name' => $togglegroup,
+                'value' => 1,
+                'classes' => 'itemselect ignoredirty',
+                'label' => $masterlabel,
+                // Consistent label to prevent the select column from resizing.
+                'selectall' => $masterlabel,
+                'deselectall' => $masterlabel,
+                'labelclasses' => 'accesshide',
+            ]);
+
+            $mastercheckbox = $OUTPUT->render($mastercheckbox);
+        }
+
         $moveaction = isset($params['moveaction']) ? $params['moveaction'] : '';
         $categorycell = parent::get_category_cell($category, $levelclass, $params);
         $categorycell->colspan = ($this->deepest_level + 2) - $params['level'];
-        $categorycell->text = html_writer::div($visibilitytoggle . $moveaction . $params['name'], 'font-weight-bold');
+        $rowtitle = html_writer::div($params['name'], 'rowtitle');
+        $categorycell->text = html_writer::div($mastercheckbox . $visibilitytoggle . $moveaction . $rowtitle, 'font-weight-bold');
         return $categorycell;
     }
 
     public function get_item_cell($item, $params) {
-        global $CFG;
-
         if (empty($params['element']) || empty($params['name']) || empty($params['level'])) {
             throw new Exception('Array key (name, level or element) missing from 2nd param of grade_edit_tree_column_name::get_item_cell($item, $params)');
         }
 
         $itemicon = \html_writer::div($params['icon'], 'mr-1');
         $itemtype = \html_writer::span($params['type'], 'd-block text-uppercase small dimmed_text');
-
-        // Generate the content for a cell that represents a grade item.
-        // If a behat test site is running avoid outputting the information about the type of the grade item.
-        // This additional information causes issues in behat particularly with the existing xpath used to
-        // interact with table elements.
-        if (!defined('BEHAT_SITE_RUNNING')) {
-            $content = \html_writer::div($itemtype . $params['name']);
-        } else {
-            $content = \html_writer::div($params['name']);
-        }
+        $itemtitle = html_writer::div($params['name'], 'rowtitle');
+        $content = \html_writer::div($itemtype . $itemtitle);
 
         $moveaction = isset($params['moveaction']) ? $params['moveaction'] : '';
 
         $itemcell = parent::get_item_cell($item, $params);
         $itemcell->colspan = ($this->deepest_level + 1) - $params['level'];
-        $itemcell->text = \html_writer::div($moveaction . $itemicon . $content, "{$params['itemtype']} d-flex align-items-center");
+
+        $checkbox = '';
+        if (($this->deepest_level > 1) && ($params['itemtype'] != 'course') && ($params['itemtype'] != 'category')) {
+            global $OUTPUT;
+
+            $label = get_string('select', 'grades', $params['name']);
+
+            if (empty($params['itemtype']) || empty($params['eid'])) {
+                throw new \moodle_exception('missingitemtypeoreid', 'core_grades');
+            }
+
+            // Fetch the grade item's category.
+            $category = $item->get_parent_category();
+            $togglegroup = $this->get_checkbox_togglegroup($category);
+
+            $checkboxid = 'select_' . $params['eid'];
+            $checkbox = new \core\output\checkbox_toggleall($togglegroup, false, [
+                'id' => $checkboxid,
+                'name' => $checkboxid,
+                'label' => $label,
+                'labelclasses' => 'accesshide',
+                'classes' => 'itemselect ignoredirty',
+            ]);
+            $checkbox = $OUTPUT->render($checkbox);
+        }
+
+        $itemcell->text = \html_writer::div($checkbox . $moveaction . $itemicon . $content,
+            "{$params['itemtype']} d-flex align-items-center");
         return $itemcell;
+    }
+
+    /**
+     * Generates a toggle group name for a bulk-action checkbox based on the given grade category.
+     *
+     * @param grade_category $category The grade category.
+     * @return string
+     */
+    protected function get_checkbox_togglegroup(grade_category $category): string {
+        $levels = [];
+        $categories = explode('/', $category->path);
+        foreach ($categories as $categoryid) {
+            $level = 'category' . $categoryid;
+            if (!in_array($level, $levels)) {
+                $levels[] = 'category' . $categoryid;
+            }
+        }
+        $togglegroup = implode(' ', $levels);
+
+        return $togglegroup;
     }
 }
 
@@ -997,34 +1068,40 @@ class grade_edit_tree_column_status extends grade_edit_tree_column {
      */
     public function get_category_cell($category, $levelclass, $params) {
         global $OUTPUT, $gtree;
+
+        $category->load_grade_item();
         $categorycell = parent::get_category_cell($category, $levelclass, $params);
         $element = [];
         $element['object'] = $category;
         $categorycell->text = $gtree->set_grade_status_icons($element);
 
-        // Aggregation type.
-        $aggrstrings = grade_helper::get_aggregation_strings();
         $context = new stdClass();
-        $context->aggregation = $aggrstrings[$category->aggregation];
+        if ($category->grade_item->is_calculated()) {
+            $context->calculatedgrade = get_string('calculatedgrade', 'grades');
+        } else {
+            // Aggregation type.
+            $aggrstrings = grade_helper::get_aggregation_strings();
+            $context->aggregation = $aggrstrings[$category->aggregation];
 
-        // Include/exclude empty grades.
-        if ($category->aggregateonlygraded) {
-            $context->aggregateonlygraded = $category->aggregateonlygraded;
-        }
+            // Include/exclude empty grades.
+            if ($category->aggregateonlygraded) {
+                $context->aggregateonlygraded = $category->aggregateonlygraded;
+            }
 
-        // Aggregate outcomes.
-        if ($category->aggregateoutcomes) {
-            $context->aggregateoutcomes = $category->aggregateoutcomes;
-        }
+            // Aggregate outcomes.
+            if ($category->aggregateoutcomes) {
+                $context->aggregateoutcomes = $category->aggregateoutcomes;
+            }
 
-        // Drop the lowest.
-        if ($category->droplow) {
-            $context->droplow = $category->droplow;
-        }
+            // Drop the lowest.
+            if ($category->droplow) {
+                $context->droplow = $category->droplow;
+            }
 
-        // Keep the highest.
-        if ($category->keephigh) {
-            $context->keephigh = $category->keephigh;
+            // Keep the highest.
+            if ($category->keephigh) {
+                $context->keephigh = $category->keephigh;
+            }
         }
         $categorycell->text .= $OUTPUT->render_from_template('core_grades/category_settings', $context);
         return $categorycell;
@@ -1090,19 +1167,36 @@ class grade_edit_tree_column_actions extends grade_edit_tree_column {
 /**
  * Class grade_edit_tree_column_select
  *
+ * @deprecated Since Moodle 4.3.
+ * @todo Final deprecation on Moodle 4.7 MDL-77668
+ *
  * @package   core_grades
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class grade_edit_tree_column_select extends grade_edit_tree_column {
 
+    /**
+     * @deprecated Since Moodle 4.3.
+     * @todo Final deprecation on Moodle 4.7 MDL-77668
+     */
     public function get_header_cell() {
+        debugging('Method grade_edit_tree_column_select::get_header_cell() is deprecated, ' .
+            'please do not use it anymore.', DEBUG_DEVELOPER);
+
         $headercell = clone($this->headercell);
         $headercell->text = get_string('select');
         return $headercell;
     }
 
+    /**
+     * @deprecated Since Moodle 4.3.
+     * @todo Final deprecation on Moodle 4.7 MDL-77668
+     */
     public function get_category_cell($category, $levelclass, $params) {
         global $OUTPUT;
+
+        debugging('Method grade_edit_tree_column_select::get_category_cell() is deprecated, ' .
+            'please do not use it anymore.', DEBUG_DEVELOPER);
 
         if (empty($params['eid'])) {
             throw new Exception('Array key (eid) missing from 3rd param of grade_edit_tree_column_select::get_category_cell($category, $levelclass, $params)');
@@ -1138,7 +1232,14 @@ class grade_edit_tree_column_select extends grade_edit_tree_column {
         return $categorycell;
     }
 
+    /**
+     * @deprecated Since Moodle 4.3.
+     * @todo Final deprecation on Moodle 4.7 MDL-77668
+     */
     public function get_item_cell($item, $params) {
+        debugging('Method grade_edit_tree_column_select::get_item_cell() is deprecated, ' .
+            'please do not use it anymore.', DEBUG_DEVELOPER);
+
         if (empty($params['itemtype']) || empty($params['eid'])) {
             throw new \moodle_exception('missingitemtypeoreid', 'core_grades');
         }
@@ -1167,10 +1268,16 @@ class grade_edit_tree_column_select extends grade_edit_tree_column {
     /**
      * Generates a toggle group name for a bulk-action checkbox based on the given grade category.
      *
+     * @deprecated Since Moodle 4.3.
+     * @todo Final deprecation on Moodle 4.7 MDL-77668
+     *
      * @param grade_category $category The grade category.
      * @return string
      */
     protected function get_checkbox_togglegroup(grade_category $category): string {
+        debugging('Method grade_edit_tree_column_select::get_checkbox_togglegroup() is deprecated, ' .
+            'please do not use it anymore.', DEBUG_DEVELOPER);
+
         $levels = [];
         $categories = explode('/', $category->path);
         foreach ($categories as $categoryid) {

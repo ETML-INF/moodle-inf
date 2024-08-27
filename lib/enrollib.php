@@ -137,7 +137,7 @@ function enrol_get_plugins($enabled) {
 /**
  * Returns instance of enrol plugin
  * @param  string $name name of enrol plugin ('manual', 'guest', ...)
- * @return enrol_plugin
+ * @return ?enrol_plugin
  */
 function enrol_get_plugin($name) {
     global $CFG;
@@ -476,6 +476,17 @@ function enrol_add_course_navigation(navigation_node $coursenode, $course) {
         if (!$url) {
             $instancesnode->trim_if_empty();
         }
+
+        if (has_capability('moodle/course:renameroles', $coursecontext)) {
+            $url = new moodle_url('/enrol/renameroles.php', array('id' => $course->id));
+            $instancesnode->add(
+                get_string('rolerenaming'),
+                $url,
+                navigation_node::TYPE_SETTING,
+                null,
+                'renameroles'
+            );
+        }
     }
 
     // Manage groups in this course or even frontpage
@@ -484,7 +495,10 @@ function enrol_add_course_navigation(navigation_node $coursenode, $course) {
         $usersnode->add(get_string('groups'), $url, navigation_node::TYPE_SETTING, null, 'groups', new pix_icon('i/group', ''));
     }
 
-     if (has_any_capability(array( 'moodle/role:assign', 'moodle/role:safeoverride','moodle/role:override', 'moodle/role:review'), $coursecontext)) {
+    if (has_any_capability(
+        [ 'moodle/role:assign', 'moodle/role:safeoverride', 'moodle/role:override', 'moodle/role:review'],
+        $coursecontext
+    )) {
         // Override roles
         if (has_capability('moodle/role:review', $coursecontext)) {
             $url = new moodle_url('/admin/roles/permissions.php', array('contextid'=>$coursecontext->id));
@@ -505,7 +519,7 @@ function enrol_add_course_navigation(navigation_node $coursenode, $course) {
             $url = new moodle_url('/admin/roles/check.php', array('contextid'=>$coursecontext->id));
             $permissionsnode->add(get_string('checkpermissions', 'role'), $url, navigation_node::TYPE_SETTING, null, 'permissions', new pix_icon('i/checkpermissions', ''));
         }
-     }
+    }
 
      // Deal somehow with users that are not enrolled but still got a role somehow
     if ($course->id != SITEID) {
@@ -963,7 +977,7 @@ function enrol_get_users_courses($userid, $onlyactive = false, $fields = null, $
  * @param int $courseid Course id.
  * @return array Array[$userid][$roleid] = role_assignment.
  */
-function enrol_get_course_users_roles(int $courseid) : array {
+function enrol_get_course_users_roles(int $courseid): array {
     global $DB;
 
     $context = context_course::instance($courseid);
@@ -1462,7 +1476,7 @@ function is_enrolled(context $context, $user = null, $withcapability = '', $only
  * @param string|array $capability optional, may include a capability name, or array of names.
  *      If an array is provided then this is the equivalent of a logical 'OR',
  *      i.e. the user needs to have one of these capabilities.
- * @param int|array $groupids The groupids, 0 or [] means all groups and USERSWITHOUTGROUP no group
+ * @param int|array|null $groupids The groupids, 0 or [] means all groups and USERSWITHOUTGROUP no group
  * @param bool $onlyactive consider only active enrolments in enabled plugins and time restrictions
  * @param bool $onlysuspended inverse of onlyactive, consider only suspended enrolments
  * @param int $enrolid The enrolment ID. If not 0, only users enrolled using this enrolment method will be returned.
@@ -1514,7 +1528,7 @@ function get_enrolled_with_capabilities_join(context $context, $prefix = '', $ca
  *
  * @param context $context
  * @param string $withcapability
- * @param int|array $groupids The groupids, 0 or [] means all groups and USERSWITHOUTGROUP no group
+ * @param int|array|null $groupids The groupids, 0 or [] means all groups and USERSWITHOUTGROUP no group
  * @param bool $onlyactive consider only active enrolments in enabled plugins and time restrictions
  * @param bool $onlysuspended inverse of onlyactive, consider only suspended enrolments
  * @param int $enrolid The enrolment ID. If not 0, only users enrolled using this enrolment method will be returned.
@@ -1949,7 +1963,6 @@ abstract class enrol_plugin {
      * Sets plugin config value
      * @param  string $name name of config
      * @param  string $value string config value, null means delete
-     * @return string value
      */
     public function set_config($name, $value) {
         $pluginname = $this->get_name();
@@ -2142,6 +2155,13 @@ abstract class enrol_plugin {
                     $ue->status, $ue->timestart, $ue->timeend);
         }
 
+        // Dispatch the hook for post enrol user actions.
+        $hook = new \core_enrol\hook\after_user_enrolled(
+            enrolinstance: $instance,
+            userenrolmentinstance: $ue,
+        );
+        \core\di::get(\core\hook\manager::class)->dispatch($hook);
+
         if ($roleid) {
             // this must be done after the enrolment event so that the role_assigned event is triggered afterwards
             if ($this->roles_protected()) {
@@ -2194,9 +2214,12 @@ abstract class enrol_plugin {
         }
 
         $modified = false;
+        $statusmodified = false;
+        $timeendmodified = false;
         if (isset($status) and $ue->status != $status) {
             $ue->status = $status;
             $modified = true;
+            $statusmodified = true;
         }
         if (isset($timestart) and $ue->timestart != $timestart) {
             $ue->timestart = $timestart;
@@ -2205,12 +2228,22 @@ abstract class enrol_plugin {
         if (isset($timeend) and $ue->timeend != $timeend) {
             $ue->timeend = $timeend;
             $modified = true;
+            $timeendmodified = true;
         }
 
         if (!$modified) {
             // no change
             return;
         }
+
+        // Dispatch the hook for pre user enrolment update actions.
+        $hook = new \core_enrol\hook\before_user_enrolment_updated(
+            enrolinstance: $instance,
+            userenrolmentinstance: $ue,
+            statusmodified: $statusmodified,
+            timeendmodified: $timeendmodified,
+        );
+        \core\di::get(\core\hook\manager::class)->dispatch($hook);
 
         $ue->modifierid = $USER->id;
         $ue->timemodified = time();
@@ -2263,6 +2296,13 @@ abstract class enrol_plugin {
             return;
         }
 
+        // Dispatch the hook for pre user unenrolment actions.
+        $hook = new \core_enrol\hook\before_user_enrolment_removed(
+            enrolinstance: $instance,
+            userenrolmentinstance: $ue,
+        );
+        \core\di::get(\core\hook\manager::class)->dispatch($hook);
+
         // Remove all users groups linked to this enrolment instance.
         if ($gms = $DB->get_records('groups_members', array('userid'=>$userid, 'component'=>'enrol_'.$name, 'itemid'=>$instance->id))) {
             foreach ($gms as $gm) {
@@ -2314,7 +2354,6 @@ abstract class enrol_plugin {
                     )
                 );
         $event->trigger();
-
         // User enrolments have changed, so mark user as dirty.
         mark_user_dirty($userid);
 
@@ -2388,7 +2427,7 @@ abstract class enrol_plugin {
     /**
      * Returns link to page which may be used to add new instance of enrolment plugin in course.
      * @param int $courseid
-     * @return moodle_url page url
+     * @return ?moodle_url page url
      */
     public function get_newinstance_link($courseid) {
         // override for most plugins, check if instance already exists in cases only one instance is supported
@@ -2429,7 +2468,7 @@ abstract class enrol_plugin {
      * Does the access control tests automatically.
      *
      * @param object $instance
-     * @return moodle_url
+     * @return ?moodle_url
      */
     public function get_manual_enrol_link($instance) {
         return NULL;
@@ -2439,7 +2478,7 @@ abstract class enrol_plugin {
      * Returns list of unenrol links for all enrol instances in course.
      *
      * @param stdClass $instance
-     * @return moodle_url or NULL if self unenrolment not supported
+     * @return ?moodle_url or NULL if self unenrolment not supported
      */
     public function get_unenrolself_link($instance) {
         global $USER, $CFG, $DB;
@@ -2625,10 +2664,37 @@ abstract class enrol_plugin {
      * Not all plugins support this.
      *
      * @param object $course
-     * @return int id of new instance or null if no default supported
+     * @return ?int id of new instance or null if no default supported
      */
     public function add_default_instance($course) {
         return null;
+    }
+
+    /**
+     * Add new instance of enrol plugin with custom settings,
+     * called when adding new instance manually or when adding new course.
+     * Used for example on course upload.
+     *
+     * Not all plugins support this.
+     *
+     * @param stdClass $course Course object
+     * @param array|null $fields instance fields
+     * @return int|null id of new instance or null if not supported
+     */
+    public function add_custom_instance(stdClass $course, ?array $fields = null): ?int {
+        return null;
+    }
+
+    /**
+     * Check if enrolment plugin is supported in csv course upload.
+     *
+     * If supported, plugins are also encouraged to override methods:
+     * {@see self::fill_enrol_custom_fields()}, {@see self::validate_plugin_data_context()}
+     *
+     * @return bool
+     */
+    public function is_csv_upload_supported(): bool {
+        return false;
     }
 
     /**
@@ -2646,11 +2712,40 @@ abstract class enrol_plugin {
         $instance->status = $newstatus;
         $DB->update_record('enrol', $instance);
 
+        // Dispatch the hook for post enrol status update actions.
+        $hook = new \core_enrol\hook\after_enrol_instance_status_updated(
+            enrolinstance: $instance,
+            newstatus: $newstatus,
+        );
+        \core\di::get(\core\hook\manager::class)->dispatch($hook);
+
         $context = context_course::instance($instance->courseid);
         \core\event\enrol_instance_updated::create_from_record($instance)->trigger();
 
         // Invalidate all enrol caches.
         $context->mark_dirty();
+    }
+
+    /**
+     * Update instance members.
+     *
+     * Update communication room membership for an instance action being performed.
+     *
+     * @param int $enrolmentinstanceid ID of the enrolment instance
+     * @param string $action The update action being performed
+     * @param stdClass $course The course object
+     * @return void
+     * @deprecated Since Moodle 4.4.0.
+     * @see \core_communication\hook_listener::update_communication_memberships_for_enrol_status_change()
+     * @todo MDL-80491 Final deprecation in Moodle 4.8.
+     *
+     */
+    public function update_communication(int $enrolmentinstanceid, string $action, stdClass $course): void {
+        debugging('Use of method update_communication is deprecated. This feature has been moved to
+        core_communication as a part of hooks api implementation so that plugins or core does not need to call this method anymore.
+        Method update_communication_memberships_for_enrol_status_change method in communication/classes/hook_listener.php
+        now handles all the operations related to this method using hooks callback recorded in lib/db/hooks.php.', DEBUG_DEVELOPER);
+        return;
     }
 
     /**
@@ -2665,6 +2760,12 @@ abstract class enrol_plugin {
         if ($instance->enrol !== $name) {
             throw new coding_exception('invalid enrol instance!');
         }
+
+        // Dispatch the hook for pre enrol instance delete actions.
+        $hook = new \core_enrol\hook\before_enrol_instance_deleted(
+            enrolinstance: $instance,
+        );
+        \core\di::get(\core\hook\manager::class)->dispatch($hook);
 
         //first unenrol all users
         $participants = $DB->get_recordset('user_enrolments', array('enrolid'=>$instance->id));
@@ -3032,7 +3133,7 @@ abstract class enrol_plugin {
      * @param progress_trace $trace (accepts bool for backwards compatibility only)
      */
     public function send_expiry_notifications($trace) {
-        global $DB, $CFG;
+        global $CFG;
 
         $name = $this->get_name();
         if (!enrol_is_enabled($name)) {
@@ -3077,6 +3178,28 @@ abstract class enrol_plugin {
         $trace->output('Processing '.$name.' enrolment expiration notifications...');
 
         // Notify users responsible for enrolment once every day.
+        $this->fetch_users_and_notify_expiry($timenow, $name, $trace);
+
+        $trace->output('...notification processing finished.');
+        $trace->finished();
+
+        $this->set_config('expirynotifylast', $timenow);
+    }
+
+    /**
+     * Notify users about enrolment expiration.
+     *
+     * Retrieves enrolment data from the database and notifies users about their
+     * upcoming course enrolment expiration based on expiry thresholds and notification settings.
+     *
+     * @param int $timenow Current time.
+     * @param string $name Name of this enrol plugin.
+     * @param progress_trace $trace (accepts bool for backwards compatibility only).
+     * @return void
+     */
+    protected function fetch_users_and_notify_expiry(int $timenow, string $name, progress_trace $trace): void {
+        global $DB, $CFG;
+
         $sql = "SELECT ue.*, e.expirynotify, e.notifyall, e.expirythreshold, e.courseid, c.fullname
                   FROM {user_enrolments} ue
                   JOIN {enrol} e ON (e.id = ue.enrolid AND e.enrol = :name AND e.expirynotify > 0 AND e.status = :enabled)
@@ -3084,26 +3207,35 @@ abstract class enrol_plugin {
                   JOIN {user} u ON (u.id = ue.userid AND u.deleted = 0 AND u.suspended = 0)
                  WHERE ue.status = :active AND ue.timeend > 0 AND ue.timeend > :now1 AND ue.timeend < (e.expirythreshold + :now2)
               ORDER BY ue.enrolid ASC, u.lastname ASC, u.firstname ASC, u.id ASC";
-        $params = array('enabled'=>ENROL_INSTANCE_ENABLED, 'active'=>ENROL_USER_ACTIVE, 'now1'=>$timenow, 'now2'=>$timenow, 'name'=>$name);
+        $params = [
+            'enabled' => ENROL_INSTANCE_ENABLED,
+            'active' => ENROL_USER_ACTIVE,
+            'now1' => $timenow,
+            'now2' => $timenow,
+            'name' => $name,
+        ];
 
         $rs = $DB->get_recordset_sql($sql, $params);
 
         $lastenrollid = 0;
-        $users = array();
+        $users = [];
 
-        foreach($rs as $ue) {
-            if ($lastenrollid and $lastenrollid != $ue->enrolid) {
+        foreach ($rs as $ue) {
+            if ($lastenrollid && $lastenrollid != $ue->enrolid) {
                 $this->notify_expiry_enroller($lastenrollid, $users, $trace);
-                $users = array();
+                $users = [];
             }
             $lastenrollid = $ue->enrolid;
 
             $enroller = $this->get_enroller($ue->enrolid);
             $context = context_course::instance($ue->courseid);
 
-            $user = $DB->get_record('user', array('id'=>$ue->userid));
+            $user = $DB->get_record('user', ['id' => $ue->userid]);
 
-            $users[] = array('fullname'=>fullname($user, has_capability('moodle/site:viewfullnames', $context, $enroller)), 'timeend'=>$ue->timeend);
+            $users[] = [
+                'fullname' => fullname($user, has_capability('moodle/site:viewfullnames', $context, $enroller)),
+                'timeend' => $ue->timeend,
+            ];
 
             if (!$ue->notifyall) {
                 continue;
@@ -3111,7 +3243,8 @@ abstract class enrol_plugin {
 
             if ($ue->timeend - $ue->expirythreshold + 86400 < $timenow) {
                 // Notify enrolled users only once at the start of the threshold.
-                $trace->output("user $ue->userid was already notified that enrolment in course $ue->courseid expires on ".userdate($ue->timeend, '', $CFG->timezone), 1);
+                $trace->output("user $ue->userid was already notified that enrolment in course $ue->courseid expires on ".
+                    userdate($ue->timeend, '', $CFG->timezone), 1);
                 continue;
             }
 
@@ -3119,14 +3252,9 @@ abstract class enrol_plugin {
         }
         $rs->close();
 
-        if ($lastenrollid and $users) {
+        if ($lastenrollid && $users) {
             $this->notify_expiry_enroller($lastenrollid, $users, $trace);
         }
-
-        $trace->output('...notification processing finished.');
-        $trace->finished();
-
-        $this->set_config('expirynotifylast', $timenow);
     }
 
     /**
@@ -3162,14 +3290,10 @@ abstract class enrol_plugin {
         $enroller = $this->get_enroller($ue->enrolid);
         $context = context_course::instance($ue->courseid);
 
-        $a = new stdClass();
-        $a->course   = format_string($ue->fullname, true, array('context'=>$context));
-        $a->user     = fullname($user, true);
-        $a->timeend  = userdate($ue->timeend, '', $user->timezone);
-        $a->enroller = fullname($enroller, has_capability('moodle/site:viewfullnames', $context, $user));
+        $subject = get_string('expirymessageenrolledsubject', 'enrol_'.$name);
+        $body = $this->get_expiry_message_body($user, $ue, $name, $enroller, $context);
 
-        $subject = get_string('expirymessageenrolledsubject', 'enrol_'.$name, $a);
-        $body = get_string('expirymessageenrolledbody', 'enrol_'.$name, $a);
+        $coursename = format_string($ue->fullname, true, ['context' => $context]);
 
         $message = new \core\message\message();
         $message->courseid          = $ue->courseid;
@@ -3183,16 +3307,38 @@ abstract class enrol_plugin {
         $message->fullmessageformat = FORMAT_MARKDOWN;
         $message->fullmessagehtml   = markdown_to_html($body);
         $message->smallmessage      = $subject;
-        $message->contexturlname    = $a->course;
-        $message->contexturl        = (string)new moodle_url('/course/view.php', array('id'=>$ue->courseid));
+        $message->contexturlname    = $coursename;
+        $message->contexturl        = (string)new moodle_url('/course/view.php', ['id' => $ue->courseid]);
 
         if (message_send($message)) {
-            $trace->output("notifying user $ue->userid that enrolment in course $ue->courseid expires on ".userdate($ue->timeend, '', $CFG->timezone), 1);
+            $stringmessage = 'notifying user %s that enrolment in course %s expires on %s';
         } else {
-            $trace->output("error notifying user $ue->userid that enrolment in course $ue->courseid expires on ".userdate($ue->timeend, '', $CFG->timezone), 1);
+            $stringmessage = 'error notifying user %s that enrolment in course %s expires on %s';
         }
+        $outputmessage = sprintf($stringmessage, $ue->userid, $ue->courseid, userdate($ue->timeend, '', $CFG->timezone));
+        $trace->output($outputmessage, 1);
 
         force_current_language($oldforcelang);
+    }
+
+    /**
+     * Generate subject and body messages for enrolment expiration notification.
+     *
+     * @param stdClass $user An object representing the user.
+     * @param stdClass $ue An object containing enrolment data.
+     * @param string $name Name of this enrol plugin.
+     * @param stdClass $enroller The user who is responsible for enrolments.
+     * @param context $context The context object.
+     * @return string Return the body message.
+     */
+    protected function get_expiry_message_body(stdClass $user, stdClass $ue, string $name,
+            stdClass $enroller, context $context): string {
+        $a = new stdClass();
+        $a->course   = format_string($ue->fullname, true, ['context' => $context]);
+        $a->user     = fullname($user, true);
+        $a->timeend  = userdate($ue->timeend, '', $user->timezone);
+        $a->enroller = fullname($enroller, has_capability('moodle/site:viewfullnames', $context, $user));
+        return get_string('expirymessageenrolledbody', 'enrol_'.$name, $a);
     }
 
     /**
@@ -3347,6 +3493,9 @@ abstract class enrol_plugin {
         $errors = array();
         $invalidstr = get_string('invaliddata', 'error');
         foreach ($rules as $fieldname => $rule) {
+            if (!array_key_exists($fieldname, $data)) {
+                continue;
+            }
             if (is_array($rule)) {
                 if (!in_array($data[$fieldname], $rule)) {
                     $errors[$fieldname] = $invalidstr;
@@ -3358,5 +3507,281 @@ abstract class enrol_plugin {
             }
         }
         return $errors;
+    }
+
+    /**
+     * Fill custom fields data for a given enrolment plugin.
+     *
+     * For example: resolve linked entities from the idnumbers (cohort, role, group, etc.)
+     * Also fill the default values that are not specified.
+     *
+     * @param array $enrolmentdata enrolment data received in CSV file in tool_uploadcourse
+     * @param int $courseid Course ID.
+     * @return array Updated enrolment data with custom fields info.
+     */
+    public function fill_enrol_custom_fields(array $enrolmentdata, int $courseid): array {
+        return $enrolmentdata;
+    }
+
+    /**
+     * Check if data is valid for a given enrolment plugin
+     *
+     * @param array $enrolmentdata enrolment data to validate.
+     * @param int|null $courseid Course ID.
+     * @return array Errors
+     */
+    public function validate_enrol_plugin_data(array $enrolmentdata, ?int $courseid = null): array {
+        $errors = [];
+        if (!$this->is_csv_upload_supported()) {
+            $errors['errorunsupportedmethod'] =
+                new lang_string('errorunsupportedmethod', 'tool_uploadcourse',
+                    get_class($this));
+        } else {
+            $plugin = $this->get_name();
+            if (!enrol_is_enabled($plugin)) {
+                $pluginname = get_string('pluginname', 'enrol_' . $plugin);
+                $errors['plugindisabled'] = new lang_string('plugindisabled', 'enrol', $pluginname);
+            }
+        }
+        return $errors;
+    }
+
+    /**
+     * Check if plugin custom data is allowed in relevant context.
+     *
+     * This is called from the tool_uploadcourse if the plugin supports instance creation in
+     * upload course ({@see self::is_csv_upload_supported()})
+     *
+     * Override it if plugin can validate provided data in relevant context.
+     *
+     * @param array $enrolmentdata enrolment data to validate.
+     * @param int|null $courseid Course ID.
+     * @return lang_string|null Error
+     */
+    public function validate_plugin_data_context(array $enrolmentdata, ?int $courseid = null): ?lang_string {
+        return null;
+    }
+
+    /**
+     * Finds matching instances for a given course.
+     *
+     * @param array $enrolmentdata enrolment data.
+     * @param int $courseid Course ID.
+     * @return stdClass|null Matching instance
+     */
+    public function find_instance(array $enrolmentdata, int $courseid): ?stdClass {
+
+        // By default, we assume we can't uniquely identify an instance so better not update any.
+        // Plugins can override this if they can uniquely identify an instance.
+        return null;
+    }
+
+    /**
+     * Get the "from" contact which the message will be sent from.
+     *
+     * @param int $sendoption send email from constant ENROL_SEND_EMAIL_FROM_*
+     * @param context $context where the user will be fetched from.
+     * @return null|stdClass the contact user object.
+     */
+    public function get_welcome_message_contact(
+        int $sendoption,
+        context $context,
+    ): ?stdClass {
+        global $CFG;
+
+        $acceptedsendoptions = [
+            ENROL_DO_NOT_SEND_EMAIL,
+            ENROL_SEND_EMAIL_FROM_COURSE_CONTACT,
+            ENROL_SEND_EMAIL_FROM_KEY_HOLDER,
+            ENROL_SEND_EMAIL_FROM_NOREPLY,
+        ];
+        if (!in_array($sendoption, $acceptedsendoptions)) {
+            throw new coding_exception('Invalid send option');
+        }
+        if ($sendoption === ENROL_DO_NOT_SEND_EMAIL) {
+            return null;
+        }
+        $contact = null;
+        // Send as the first user assigned as the course contact.
+        if ($sendoption === ENROL_SEND_EMAIL_FROM_COURSE_CONTACT) {
+            $rusers = [];
+            if (!empty($CFG->coursecontact)) {
+                $croles = explode(',', $CFG->coursecontact);
+                [$sort, $sortparams] = users_order_by_sql('u');
+                // We only use the first user.
+                $i = 0;
+                do {
+                    $userfieldsapi = \core_user\fields::for_name();
+                    $allnames = $userfieldsapi->get_sql('u', false, '', '', false)->selects;
+                    $rusers = get_role_users($croles[$i], $context, true, 'u.id,  u.confirmed, u.username, '. $allnames . ',
+                    u.email, r.sortorder, ra.id AS raid', 'r.sortorder, ra.id ASC, ' . $sort, null, '', '', '', '', $sortparams);
+                    $i++;
+                } while (empty($rusers) && !empty($croles[$i]));
+            }
+            if ($rusers) {
+                $contact = array_values($rusers)[0];
+            }
+        } else if ($sendoption === ENROL_SEND_EMAIL_FROM_KEY_HOLDER) {
+            // Send as the first user with enrol/self:holdkey capability assigned in the course.
+            [$sort] = users_order_by_sql('u');
+            $keyholders = get_users_by_capability($context, 'enrol/self:holdkey', 'u.*', $sort);
+            if (!empty($keyholders)) {
+                $contact = array_values($keyholders)[0];
+            }
+        }
+
+        if ($sendoption === ENROL_SEND_EMAIL_FROM_NOREPLY) {
+            $contact = core_user::get_noreply_user();
+        }
+
+        return $contact;
+    }
+
+    /**
+     * Send course welcome message to user.
+     *
+     * @param stdClass $instance Enrol instance.
+     * @param int $userid User ID.
+     * @param int $sendoption Send email from constant ENROL_SEND_EMAIL_FROM_*
+     * @param null|string $message Message to send to the user.
+     */
+    public function send_course_welcome_message_to_user(
+        stdClass $instance,
+        int $userid,
+        int $sendoption,
+        ?string $message = '',
+    ): void {
+        global $DB;
+        $context = context_course::instance($instance->courseid);
+        $user = core_user::get_user($userid);
+        $course = get_course($instance->courseid);
+        $courserole = $DB->get_field(
+            table: 'role',
+            return: 'shortname',
+            conditions: ['id' => $instance->roleid],
+        );
+
+        $a = new stdClass();
+        $a->coursename = format_string($course->fullname, true, ['context' => $context, 'escape' => false]);
+        $a->profileurl = (new moodle_url(
+            url: '/user/view.php',
+            params: [
+                'id' => $user->id,
+                'course' => $instance->courseid,
+            ],
+        ))->out();
+        $a->fullname = fullname($user);
+
+        if ($message && trim($message) !== '') {
+            $placeholders = [
+                '{$a->coursename}',
+                '{$a->profileurl}',
+                '{$a->fullname}',
+                '{$a->email}',
+                '{$a->firstname}',
+                '{$a->lastname}',
+                '{$a->courserole}',
+            ];
+            $values = [
+                $a->coursename,
+                $a->profileurl,
+                fullname($user),
+                $user->email,
+                $user->firstname,
+                $user->lastname,
+                $courserole,
+            ];
+            $message = str_replace($placeholders, $values, $message);
+            if (strpos($message, '<') === false) {
+                // Plain text only.
+                $messagetext = $message;
+                $messagehtml = text_to_html($messagetext, null, false, true);
+            } else {
+                // This is most probably the tag/newline soup known as FORMAT_MOODLE.
+                $messagehtml = format_text($message, FORMAT_MOODLE,
+                    ['context' => $context, 'para' => false, 'newlines' => true, 'filter' => true]);
+                $messagetext = html_to_text($messagehtml);
+            }
+        } else {
+            $messagetext = get_string('customwelcomemessageplaceholder', 'core_enrol', $a);
+            $messagehtml = text_to_html($messagetext, null, false, true);
+        }
+
+        $contact = $this->get_welcome_message_contact(
+            sendoption: $sendoption,
+            context: $context,
+        );
+        if (!$contact) {
+            // Cannot find the contact to send the message from.
+            return;
+        }
+
+        $message = new \core\message\message();
+        $message->courseid = $instance->courseid;
+        $message->component = 'moodle';
+        $message->name = 'enrolcoursewelcomemessage';
+        $message->userfrom = $contact;
+        $message->userto = $user;
+        $message->subject = get_string('welcometocourse', 'moodle', $a->coursename);
+        $message->fullmessage = $messagetext;
+        $message->fullmessageformat = FORMAT_MARKDOWN;
+        $message->fullmessagehtml = $messagehtml;
+        $message->notification = 1;
+        $message->contexturl = $a->profileurl;
+        $message->contexturlname = $course->fullname;
+
+        message_send($message);
+    }
+
+    /**
+     * Updates enrol plugin instance with provided data.
+     * @param int $courseid Course ID.
+     * @param array $enrolmentdata enrolment data.
+     * @param stdClass $instance Instance to update.
+     *
+     * @return stdClass updated instance
+     */
+    public function update_enrol_plugin_data(int $courseid, array $enrolmentdata, stdClass $instance): stdClass {
+        global $DB;
+
+        // Sort out the start, end and date.
+        $instance->enrolstartdate = (isset($enrolmentdata['startdate']) ? strtotime($enrolmentdata['startdate']) : 0);
+        $instance->enrolenddate = (isset($enrolmentdata['enddate']) ? strtotime($enrolmentdata['enddate']) : 0);
+
+        // Is the enrolment period set?
+        if (!empty($enrolmentdata['enrolperiod'])) {
+            if (preg_match('/^\d+$/', $enrolmentdata['enrolperiod'])) {
+                $enrolmentdata['enrolperiod'] = (int)$enrolmentdata['enrolperiod'];
+            } else {
+                // Try and convert period to seconds.
+                $enrolmentdata['enrolperiod'] = strtotime('1970-01-01 GMT + ' . $enrolmentdata['enrolperiod']);
+            }
+            $instance->enrolperiod = $enrolmentdata['enrolperiod'];
+        }
+        if ($instance->enrolstartdate > 0 && isset($enrolmentdata['enrolperiod'])) {
+            $instance->enrolenddate = $instance->enrolstartdate + $enrolmentdata['enrolperiod'];
+        }
+        if ($instance->enrolenddate > 0) {
+            $instance->enrolperiod = $instance->enrolenddate - $instance->enrolstartdate;
+        }
+        if ($instance->enrolenddate < $instance->enrolstartdate) {
+            $instance->enrolenddate = $instance->enrolstartdate;
+        }
+
+        // Sort out the given role.
+        if (isset($enrolmentdata['role']) || isset($enrolmentdata['roleid'])) {
+            if (isset($enrolmentdata['role'])) {
+                $roleid = $DB->get_field('role', 'id', ['shortname' => $enrolmentdata['role']], MUST_EXIST);
+            } else {
+                $roleid = $enrolmentdata['roleid'];
+            }
+            $instance->roleid = $roleid;
+        }
+
+        // Sort out custom instance name.
+        if (isset($enrolmentdata['name'])) {
+            $instance->name = $enrolmentdata['name'];
+        }
+        return $instance;
     }
 }
